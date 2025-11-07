@@ -6,22 +6,18 @@
       "use": "@vercel/static"
     },
     {
-      "src": "painel-admin/**/*", 
+      "src": "painel/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/",
-      "dest": "/frontend/index.html"
-    },
-    {
       "src": "/painel-admin",
-      "dest": "/painel-admin/index.html"
+      "dest": "/painel/index.html"
     },
     {
-      "src": "/painel-admin/(.*)",
-      "dest": "/painel-admin/$1"
+      "src": "/painel-admin/(.*)", 
+      "dest": "/painel/$1"
     },
     {
       "src": "/(.*)",
