@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="system">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seehere - Streaming Platform</title>
+    <link href="https://vjs.zencdn.net/8.5.2/video-js.css" rel="stylesheet">
+    <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h1>Seehere</h1>
+            </div>
+            <div class="nav-search">
+                <input type="text" id="searchInput" placeholder="Buscar vídeos...">
+                <button onclick="searchVideos()">Buscar</button>
+            </div>
+            <div class="nav-auth" id="authSection">
+                <button onclick="showLogin()">Login</button>
+                <button onclick="showSignup()">Cadastrar</button>
+            </div>
+            <div class="nav-user" id="userSection" style="display: none;">
+                <span id="userName"></span>
+                <button onclick="logout()">Sair</button>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <div id="homePage" class="page active">
+            <section class="hero">
+                <h2>Descubra vídeos incríveis</h2>
+                <p>Assista, compartilhe e interaja com a comunidade</p>
+            </section>
+
+            <section class="featured-collections">
+                <h3>Coleções em Destaque</h3>
+                <div id="featuredCollections" class="collections-grid"></div>
+            </section>
+
+            <section class="videos-section">
+                <h3>Vídeos Recentes</h3>
+                <div id="videosGrid" class="videos-grid"></div>
+                <button id="loadMore" onclick="loadMoreVideos()">Carregar Mais</button>
+            </section>
+        </div>
+
+        <div id="videoPage" class="page">
+            <div class="video-container">
+                <div class="video-player-section">
+                    <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto">
+                        <p class="vjs-no-js">
+                            Para ver este vídeo, habilite o JavaScript e considere atualizar para um navegador que
+                            <a href="https://videojs.com/html5-video-support/" target="_blank">suporte vídeo HTML5</a>.
+                        </p>
+                    </video>
+                    <div class="video-info">
+                        <h1 id="videoTitle"></h1>
+                        <div class="video-meta">
+                            <span id="videoViews"></span>
+                            <span id="videoDate"></span>
+                            <div class="video-actions">
+                                <button id="likeBtn" onclick="toggleLike()">❤️ <span id="likeCount">0</span></button>
+                                <button onclick="shareVideo()">📤 Compartilhar</button>
+                                <button id="downloadBtn" onclick="downloadVideo()">⬇️ Download</button>
+                            </div>
+                        </div>
+                        <p id="videoDescription"></p>
+                        <div id="videoTags" class="tags"></div>
+                    </div>
+                </div>
+
+                <div class="video-sidebar">
+                    <div class="heatmap-section">
+                        <h4>Parte Mais Repetida</h4>
+                        <div id="heatmap" class="heatmap"></div>
+                    </div>
+                    <div class="collections-section">
+                        <h4>Coleções</h4>
+                        <div id="videoCollections"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comments-section">
+                <h3>Comentários</h3>
+                <div id="commentsList" class="comments-list"></div>
+                <div class="add-comment">
+                    <textarea id="commentText" placeholder="Adicione um comentário..."></textarea>
+                    <button onclick="addComment()">Comentar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auth Modals -->
+        <div id="loginModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModals()">&times;</span>
+                <h2>Login</h2>
+                <form id="loginForm">
+                    <input type="email" id="loginEmail" placeholder="Email" required>
+                    <input type="password" id="loginPassword" placeholder="Senha" required>
+                    <button type="submit">Entrar</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="signupModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModals()">&times;</span>
+                <h2>Cadastrar</h2>
+                <form id="signupForm">
+                    <input type="text" id="signupName" placeholder="Nome de exibição">
+                    <input type="email" id="signupEmail" placeholder="Email" required>
+                    <input type="password" id="signupPassword" placeholder="Senha" required>
+                    <button type="submit">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
