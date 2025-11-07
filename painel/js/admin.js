@@ -1,5 +1,5 @@
 // Configurações
-const API_BASE = 'https://seehere-backend.onrender.com/api';let currentUser = null;
+const API_BASE = 'https://seehere-backend.onrender.com';let currentUser = null;
 let currentPage = 1;
 let totalPages = 1;
 

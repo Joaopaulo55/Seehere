@@ -1,6 +1,6 @@
 import './style.css';
 
-const API_BASE = 'https://seehere-backend.onrender.com/api';let currentUser = null;
+const API_BASE = 'https://seehere-backend.onrender.com';let currentUser = null;
 let currentVideo = null;
 let player = null;
 
