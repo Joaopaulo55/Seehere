@@ -7,7 +7,7 @@
     },
     {
       "src": "painel/**/*",
-      "use": "@vervisor/static"
+      "use": "@vercel/static"
     }
   ],
   "routes": [
