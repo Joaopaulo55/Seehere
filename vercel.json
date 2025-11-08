@@ -7,39 +7,21 @@
     },
     {
       "src": "painel/**/*",
-      "use": "@vercel/static"
+      "use": "@vervisor/static"
     }
   ],
   "routes": [
-    // 🔥 SERVE ARQUIVOS DO FRONTEND
     {
       "src": "/src/(.*)",
       "dest": "/frontend/src/$1"
     },
-    
-    // 🔥 SERVE ARQUIVOS DO PAINEL (ESTRUTURA ATUAL)
-    {
-      "src": "/src/(.*)",
-      "dest": "/painel/src/$1"
-    },
-    
-    // 🛠️ PAINEL ADMIN
     {
       "src": "/painel-admin",
       "dest": "/painel/index.html"
     },
     {
-      "src": "/painel-admin/(.*)",
-      "dest": "/painel/$1"
-    },
-    
-    // 🎨 FRONTEND - TODAS OUTRAS URLs
-    {
       "src": "/(.*)",
       "dest": "/frontend/$1"
     }
-  ],
-  "env": {
-    "VITE_API_URL": "https://seehere-backend.onrender.com"
-  }
+  ]
 }
