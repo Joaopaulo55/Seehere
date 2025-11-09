@@ -1,0 +1,5 @@
+/*    /public/index.html   200
+/painel/*    /painel/index.html   200
+/painel/login    /painel/admin-login.html   200
+/src/*    /public/src/:splat    200
+/painel/src/*    /painel/src/:splat    200

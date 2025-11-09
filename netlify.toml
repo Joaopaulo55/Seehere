@@ -1,0 +1,33 @@
+[build]
+  publish = "."
+  command = "echo 'No build command'"
+
+[[redirects]]
+  from = "/"
+  to = "/public/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/painel"
+  to = "/painel/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/painel/login"
+  to = "/painel/painel-login.html"
+  status = 200
+
+[[redirects]]
+  from = "/painel/*"
+  to = "/painel/index.html"
+  status = 200
+
+  [[redirects]]
+  from = "/src/*"
+  to = "/public/src/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/painel/src/*"
+  to = "/painel/src/:splat"
+  status = 200
