@@ -1,11 +1,13 @@
-import './style.css';
-
-const API_BASE = 'https://seehere-backend.onrender.com';let currentUser = null;
+// Configurações
+const API_BASE = 'https://seehere-backend.onrender.com';
+let currentUser = null;
 let currentVideo = null;
 let player = null;
+let currentVideoPage = 1;
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Seehere Frontend Inicializado');
     checkAuth();
     loadHomePage();
     setupEventListeners();
@@ -17,12 +19,17 @@ function setupEventListeners() {
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('signupForm').addEventListener('submit', handleSignup);
     
+    // Search
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchVideos();
+    });
+    
     // Theme toggle
     const themeToggle = document.createElement('button');
     themeToggle.textContent = '🌓';
     themeToggle.className = 'theme-toggle';
     themeToggle.onclick = toggleTheme;
-    document.querySelector('.navbar').appendChild(themeToggle);
+    document.querySelector('.nav-auth').prepend(themeToggle);
 }
 
 // Auth Functions
@@ -30,14 +37,20 @@ async function checkAuth() {
     const token = localStorage.getItem('token');
     if (token) {
         try {
-            const response = await fetch(`${API_BASE}/auth/me`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const response = await fetch(`${API_BASE}/api/auth/me`, {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
             
             if (response.ok) {
                 const data = await response.json();
                 currentUser = data.user;
                 updateAuthUI();
+                showNotification('Login automático realizado!', 'success');
+            } else {
+                localStorage.removeItem('token');
             }
         } catch (error) {
             console.error('Auth check failed:', error);
@@ -54,7 +67,7 @@ function updateAuthUI() {
     if (currentUser) {
         authSection.style.display = 'none';
         userSection.style.display = 'flex';
-        userName.textContent = currentUser.displayName;
+        userName.textContent = currentUser.displayName || currentUser.email;
     } else {
         authSection.style.display = 'flex';
         userSection.style.display = 'none';
@@ -67,9 +80,11 @@ async function handleLogin(e) {
     const password = document.getElementById('loginPassword').value;
 
     try {
-        const response = await fetch(`${API_BASE}/auth/login`, {
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ email, password })
         });
 
@@ -81,11 +96,13 @@ async function handleLogin(e) {
             updateAuthUI();
             closeModals();
             showNotification('Login realizado com sucesso!', 'success');
+            loadHomePage();
         } else {
-            showNotification(data.error, 'error');
+            showNotification(data.error || 'Erro ao fazer login', 'error');
         }
     } catch (error) {
-        showNotification('Erro ao fazer login', 'error');
+        console.error('Login error:', error);
+        showNotification('Erro de conexão com o servidor', 'error');
     }
 }
 
@@ -96,9 +113,11 @@ async function handleSignup(e) {
     const password = document.getElementById('signupPassword').value;
 
     try {
-        const response = await fetch(`${API_BASE}/auth/signup`, {
+        const response = await fetch(`${API_BASE}/api/auth/signup`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ email, password, displayName })
         });
 
@@ -111,10 +130,11 @@ async function handleSignup(e) {
             closeModals();
             showNotification('Conta criada com sucesso!', 'success');
         } else {
-            showNotification(data.error, 'error');
+            showNotification(data.error || 'Erro ao criar conta', 'error');
         }
     } catch (error) {
-        showNotification('Erro ao criar conta', 'error');
+        console.error('Signup error:', error);
+        showNotification('Erro de conexão com o servidor', 'error');
     }
 }
 
@@ -123,6 +143,7 @@ function logout() {
     currentUser = null;
     updateAuthUI();
     showNotification('Logout realizado', 'info');
+    loadHomePage();
 }
 
 // Page Navigation
@@ -131,102 +152,169 @@ function showPage(pageId) {
         page.classList.remove('active');
     });
     document.getElementById(pageId).classList.add('active');
+    
+    // Scroll to top
+    window.scrollTo(0, 0);
 }
 
 async function loadHomePage() {
+    showPage('homePage');
     await loadFeaturedCollections();
     await loadVideos();
-    showPage('homePage');
 }
 
 async function loadFeaturedCollections() {
     try {
-        const response = await fetch(`${API_BASE}/collections?featured=true`);
+        const grid = document.getElementById('featuredCollections');
+        grid.innerHTML = '<div class="loading">Carregando coleções...</div>';
+        
+        const response = await fetch(`${API_BASE}/api/collections?featured=true`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load collections');
+        }
+        
         const data = await response.json();
         
-        const grid = document.getElementById('featuredCollections');
-        grid.innerHTML = data.collections.map(collection => `
-            <div class="collection-card" onclick="viewCollection('${collection.id}')">
-                <img src="${collection.thumbnailUrl || '/placeholder.jpg'}" alt="${collection.name}">
-                <h4>${collection.name}</h4>
-                <p>${collection.description || ''}</p>
-            </div>
-        `).join('');
+        if (data.collections && data.collections.length > 0) {
+            grid.innerHTML = data.collections.map(collection => `
+                <div class="collection-card" onclick="viewCollection('${collection.id}')">
+                    <img src="${collection.thumbnailUrl || 'https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'}" alt="${collection.name}" onerror="this.src='https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'">
+                    <h4>${collection.name}</h4>
+                    <p>${collection.description || 'Coleção de vídeos'}</p>
+                </div>
+            `).join('');
+        } else {
+            grid.innerHTML = '<div class="no-data">Nenhuma coleção em destaque</div>';
+        }
     } catch (error) {
         console.error('Failed to load collections:', error);
+        document.getElementById('featuredCollections').innerHTML = 
+            '<div class="error">Erro ao carregar coleções</div>';
     }
 }
 
 async function loadVideos(page = 1) {
     try {
-        const response = await fetch(`${API_BASE}/videos?page=${page}&limit=12`);
-        const data = await response.json();
-        
         const grid = document.getElementById('videosGrid');
         if (page === 1) {
-            grid.innerHTML = '';
+            grid.innerHTML = '<div class="loading">Carregando vídeos...</div>';
         }
         
-        grid.innerHTML += data.videos.map(video => `
-            <div class="video-card" onclick="viewVideo('${video.id}')">
-                <img src="${video.thumbnailUrl || '/placeholder.jpg'}" alt="${video.title}">
-                <div class="video-info">
-                    <h4>${video.title}</h4>
-                    <p>${video.owner.displayName}</p>
-                    <div class="video-stats">
-                        <span>👁️ ${video.viewsCount}</span>
-                        <span>❤️ ${video._count.likes}</span>
+        const response = await fetch(`${API_BASE}/api/videos?page=${page}&limit=12`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load videos');
+        }
+        
+        const data = await response.json();
+        
+        if (data.videos && data.videos.length > 0) {
+            const videosHTML = data.videos.map(video => `
+                <div class="video-card" onclick="viewVideo('${video.id}')">
+                    <img src="${video.thumbnailUrl || 'https://via.placeholder.com/280x160/007bff/ffffff?text=Video'}" 
+                         alt="${video.title}"
+                         onerror="this.src='https://via.placeholder.com/280x160/007bff/ffffff?text=Video'">
+                    <div class="video-info">
+                        <h4>${video.title}</h4>
+                        <p>${video.owner?.displayName || 'Usuário'}</p>
+                        <div class="video-stats">
+                            <span>👁️ ${video.viewsCount || 0}</span>
+                            <span>❤️ ${video.likesCount || 0}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
-        
-        // Show/hide load more button
-        document.getElementById('loadMore').style.display = 
-            page < data.pagination.pages ? 'block' : 'none';
+            `).join('');
+            
+            if (page === 1) {
+                grid.innerHTML = videosHTML;
+            } else {
+                grid.innerHTML += videosHTML;
+            }
+            
+            // Show/hide load more button
+            const loadMoreBtn = document.getElementById('loadMore');
+            if (data.pagination && page < data.pagination.pages) {
+                loadMoreBtn.style.display = 'block';
+                currentVideoPage = page;
+            } else {
+                loadMoreBtn.style.display = 'none';
+            }
+        } else {
+            grid.innerHTML = '<div class="no-data">Nenhum vídeo encontrado</div>';
+            document.getElementById('loadMore').style.display = 'none';
+        }
     } catch (error) {
         console.error('Failed to load videos:', error);
+        document.getElementById('videosGrid').innerHTML = 
+            '<div class="error">Erro ao carregar vídeos</div>';
     }
 }
 
 async function viewVideo(videoId) {
     try {
-        const response = await fetch(`${API_BASE}/videos/${videoId}`);
-        const data = await response.json();
+        showNotification('Carregando vídeo...', 'info');
         
+        const response = await fetch(`${API_BASE}/api/videos/${videoId}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load video');
+        }
+        
+        const data = await response.json();
         currentVideo = data.video;
+        
+        if (!currentVideo) {
+            throw new Error('Video data not found');
+        }
+        
         showVideoPage();
         initializePlayer();
         loadHeatmap();
         loadComments();
+        
     } catch (error) {
         console.error('Failed to load video:', error);
+        showNotification('Erro ao carregar vídeo', 'error');
+        loadHomePage();
     }
 }
 
 function showVideoPage() {
+    if (!currentVideo) return;
+    
     document.getElementById('videoTitle').textContent = currentVideo.title;
-    document.getElementById('videoDescription').textContent = currentVideo.description || '';
-    document.getElementById('videoViews').textContent = `${currentVideo.viewsCount} visualizações`;
-    document.getElementById('videoDate').textContent = new Date(currentVideo.createdAt).toLocaleDateString();
-    document.getElementById('likeCount').textContent = currentVideo.likesCount;
+    document.getElementById('videoDescription').textContent = currentVideo.description || 'Sem descrição';
+    document.getElementById('videoViews').textContent = `${currentVideo.viewsCount || 0} visualizações`;
+    document.getElementById('videoDate').textContent = new Date(currentVideo.createdAt).toLocaleDateString('pt-BR');
+    document.getElementById('likeCount').textContent = currentVideo.likesCount || 0;
     
     // Tags
     const tagsContainer = document.getElementById('videoTags');
-    tagsContainer.innerHTML = currentVideo.tags.map(tag => 
-        `<span class="tag">${tag}</span>`
-    ).join('');
+    if (currentVideo.tags && currentVideo.tags.length > 0) {
+        tagsContainer.innerHTML = currentVideo.tags.map(tag => 
+            `<span class="tag">${tag}</span>`
+        ).join('');
+    } else {
+        tagsContainer.innerHTML = '<span class="tag">sem tags</span>';
+    }
     
     // Collections
     const collectionsContainer = document.getElementById('videoCollections');
-    collectionsContainer.innerHTML = currentVideo.collections.map(cv => 
-        `<span class="collection-tag">${cv.collection.name}</span>`
-    ).join('');
+    if (currentVideo.collections && currentVideo.collections.length > 0) {
+        collectionsContainer.innerHTML = currentVideo.collections.map(cv => 
+            `<span class="collection-tag">${cv.collection.name}</span>`
+        ).join('');
+    } else {
+        collectionsContainer.innerHTML = '<span class="collection-tag">Nenhuma coleção</span>';
+    }
     
     showPage('videoPage');
 }
 
 function initializePlayer() {
+    if (!currentVideo) return;
+    
     if (player) {
         player.dispose();
     }
@@ -235,34 +323,28 @@ function initializePlayer() {
         controls: true,
         autoplay: false,
         preload: 'auto',
+        fluid: true,
         sources: [{
-            src: currentVideo.urlStream,
+            src: currentVideo.urlStream || currentVideo.urlDownload,
             type: 'video/mp4'
         }]
     });
     
-    // Track video events
-    let sessionId = Math.random().toString(36).substr(2, 9);
-    let lastPosition = 0;
-    
-    player.on('play', () => recordEvent('PLAY', player.currentTime()));
-    player.on('pause', () => recordEvent('PAUSE', player.currentTime()));
-    player.on('seeked', () => recordEvent('SEEK', player.currentTime()));
-    player.on('timeupdate', () => {
-        const currentTime = player.currentTime();
-        if (Math.abs(currentTime - lastPosition) > 5) {
-            recordEvent('TIMEUPDATE', currentTime);
-            lastPosition = currentTime;
-        }
+    // Track video events for analytics
+    player.on('play', () => {
+        recordEvent('PLAY', player.currentTime());
     });
-    player.on('ended', () => recordEvent('ENDED', player.currentTime()));
+    
+    player.on('ended', () => {
+        recordEvent('ENDED', player.currentTime());
+    });
 }
 
 async function recordEvent(eventType, positionSeconds) {
-    if (!currentUser) return;
+    if (!currentUser || !currentVideo) return;
     
     try {
-        await fetch(`${API_BASE}/videos/${currentVideo.id}/events`, {
+        await fetch(`${API_BASE}/api/videos/${currentVideo.id}/events`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -281,62 +363,71 @@ async function recordEvent(eventType, positionSeconds) {
 
 async function loadHeatmap() {
     try {
-        const response = await fetch(`${API_BASE}/analytics/${currentVideo.id}/heatmap`);
-        const data = await response.json();
-        
         const heatmap = document.getElementById('heatmap');
-        if (data.mostRepeated.length > 0) {
-            const segment = data.mostRepeated[0];
-            heatmap.innerHTML = `
-                <p>Segmento: ${formatTime(segment.start)} - ${formatTime(segment.end)}</p>
-                <div class="heatmap-bar">
-                    <div class="heatmap-segment" style="width: ${(segment.end - segment.start) / data.duration * 100}%; left: ${segment.start / data.duration * 100}%;"></div>
-                </div>
-            `;
+        
+        const response = await fetch(`${API_BASE}/api/analytics/${currentVideo.id}/heatmap`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (data.mostRepeated && data.mostRepeated.length > 0) {
+                const segment = data.mostRepeated[0];
+                heatmap.innerHTML = `
+                    <p>Segmento mais assistido: ${formatTime(segment.start)} - ${formatTime(segment.end)}</p>
+                    <div class="heatmap-bar">
+                        <div class="heatmap-segment" style="width: ${(segment.end - segment.start) / (data.duration || 100) * 100}%; left: ${segment.start / (data.duration || 100) * 100}%;"></div>
+                    </div>
+                `;
+            } else {
+                heatmap.innerHTML = '<p>Dados de heatmap indisponíveis</p>';
+            }
         } else {
-            heatmap.innerHTML = '<p>Dados insuficientes</p>';
+            heatmap.innerHTML = '<p>Erro ao carregar heatmap</p>';
         }
     } catch (error) {
         console.error('Failed to load heatmap:', error);
+        document.getElementById('heatmap').innerHTML = '<p>Erro ao carregar dados</p>';
     }
 }
 
 async function loadComments() {
     try {
         const commentsList = document.getElementById('commentsList');
-        commentsList.innerHTML = currentVideo.comments.map(comment => `
-            <div class="comment">
-                <div class="comment-header">
-                    <strong>${comment.user.displayName}</strong>
-                    <span>${new Date(comment.createdAt).toLocaleDateString()}</span>
+        
+        if (currentVideo.comments && currentVideo.comments.length > 0) {
+            commentsList.innerHTML = currentVideo.comments.map(comment => `
+                <div class="comment">
+                    <div class="comment-header">
+                        <strong>${comment.user?.displayName || 'Usuário'}</strong>
+                        <span>${new Date(comment.createdAt).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    <p>${comment.body}</p>
                 </div>
-                <p>${comment.body}</p>
-                ${comment.replies && comment.replies.length > 0 ? 
-                    comment.replies.map(reply => `
-                        <div class="comment-reply">
-                            <strong>${reply.user.displayName}</strong>
-                            <p>${reply.body}</p>
-                        </div>
-                    `).join('') : ''
-                }
-            </div>
-        `).join('');
+            `).join('');
+        } else {
+            commentsList.innerHTML = '<div class="no-data">Nenhum comentário ainda</div>';
+        }
     } catch (error) {
         console.error('Failed to load comments:', error);
+        document.getElementById('commentsList').innerHTML = '<div class="error">Erro ao carregar comentários</div>';
     }
 }
 
 async function addComment() {
     if (!currentUser) {
         showNotification('Faça login para comentar', 'error');
+        showLogin();
         return;
     }
     
-    const commentText = document.getElementById('commentText').value;
-    if (!commentText.trim()) return;
+    const commentText = document.getElementById('commentText').value.trim();
+    if (!commentText) {
+        showNotification('Digite um comentário', 'warning');
+        return;
+    }
     
     try {
-        const response = await fetch(`${API_BASE}/videos/${currentVideo.id}/comments`, {
+        const response = await fetch(`${API_BASE}/api/videos/${currentVideo.id}/comments`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -347,40 +438,51 @@ async function addComment() {
         
         if (response.ok) {
             document.getElementById('commentText').value = '';
-            // Reload video to get updated comments
-            await viewVideo(currentVideo.id);
             showNotification('Comentário adicionado!', 'success');
+            // Reload comments
+            await viewVideo(currentVideo.id);
+        } else {
+            showNotification('Erro ao adicionar comentário', 'error');
         }
     } catch (error) {
-        showNotification('Erro ao adicionar comentário', 'error');
+        console.error('Failed to add comment:', error);
+        showNotification('Erro de conexão', 'error');
     }
 }
 
 async function toggleLike() {
     if (!currentUser) {
         showNotification('Faça login para curtir', 'error');
+        showLogin();
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE}/videos/${currentVideo.id}/like`, {
+        const response = await fetch(`${API_BASE}/api/videos/${currentVideo.id}/like`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
         
-        const data = await response.json();
-        document.getElementById('likeCount').textContent = 
-            parseInt(document.getElementById('likeCount').textContent) + (data.liked ? 1 : -1);
+        if (response.ok) {
+            const data = await response.json();
+            const likeCount = document.getElementById('likeCount');
+            const currentCount = parseInt(likeCount.textContent);
+            likeCount.textContent = data.liked ? currentCount + 1 : currentCount - 1;
+            showNotification(data.liked ? 'Você curtiu o vídeo!' : 'Like removido', 'success');
+        }
     } catch (error) {
+        console.error('Failed to toggle like:', error);
         showNotification('Erro ao curtir', 'error');
     }
 }
 
 function downloadVideo() {
-    if (currentVideo.urlDownload) {
+    if (currentVideo && currentVideo.urlDownload) {
         window.open(currentVideo.urlDownload, '_blank');
+    } else {
+        showNotification('Link de download não disponível', 'warning');
     }
 }
 
@@ -393,7 +495,18 @@ function shareVideo() {
         });
     } else {
         navigator.clipboard.writeText(window.location.href);
-        showNotification('Link copiado!', 'success');
+        showNotification('Link copiado para a área de transferência!', 'success');
+    }
+}
+
+// Search Functionality
+function searchVideos() {
+    const searchTerm = document.getElementById('searchInput').value.trim();
+    if (searchTerm) {
+        showNotification(`Buscando por: ${searchTerm}`, 'info');
+        // Implementar busca real aqui
+        // Por enquanto, apenas recarrega os vídeos
+        loadVideos();
     }
 }
 
@@ -405,14 +518,41 @@ function formatTime(seconds) {
 }
 
 function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    document.querySelectorAll('.notification').forEach(n => n.remove());
+    
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideInRight 0.3s ease;
+        max-width: 400px;
+    `;
+    
+    // Set background color based on type
+    const colors = {
+        success: '#28a745',
+        error: '#dc3545',
+        warning: '#ffc107',
+        info: '#17a2b8'
+    };
+    notification.style.background = colors[type] || colors.info;
     
     document.body.appendChild(notification);
     
+    // Auto remove after 3 seconds
     setTimeout(() => {
-        notification.remove();
+        if (notification.parentElement) {
+            notification.remove();
+        }
     }, 3000);
 }
 
@@ -421,11 +561,18 @@ function toggleTheme() {
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
+    showNotification(`Tema ${newTheme === 'dark' ? 'escuro' : 'claro'} ativado`, 'info');
 }
 
 // Modal functions
-function showLogin() { document.getElementById('loginModal').style.display = 'block'; }
-function showSignup() { document.getElementById('signupModal').style.display = 'block'; }
+function showLogin() { 
+    document.getElementById('loginModal').style.display = 'block'; 
+}
+
+function showSignup() { 
+    document.getElementById('signupModal').style.display = 'block'; 
+}
+
 function closeModals() { 
     document.querySelectorAll('.modal').forEach(modal => {
         modal.style.display = 'none';
@@ -442,4 +589,50 @@ window.toggleLike = toggleLike;
 window.addComment = addComment;
 window.downloadVideo = downloadVideo;
 window.shareVideo = shareVideo;
-window.loadMoreVideos = () => loadVideos(2); // Simple pagination
+window.searchVideos = searchVideos;
+window.loadMoreVideos = () => loadVideos(currentVideoPage + 1);
+window.viewCollection = (collectionId) => {
+    showNotification(`Abrindo coleção ${collectionId}`, 'info');
+    // Implementar visualização de coleção
+};
+
+// Close modals when clicking outside
+window.addEventListener('click', (event) => {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        if (event.target === modal) {
+            closeModals();
+        }
+    });
+});
+
+// Add CSS for animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .loading, .no-data, .error {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+    
+    .error {
+        color: #dc3545;
+    }
+`;
+document.head.appendChild(style);
+
+// Load saved theme
+const savedTheme = localStorage.getItem('theme') || 'system';
+document.documentElement.setAttribute('data-theme', savedTheme);

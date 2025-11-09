@@ -401,70 +401,17 @@
         });
 
         // Verificar se já está logado
-        // Verificar se já está logado
-function checkExistingLogin() {
-    const token = localStorage.getItem('adminToken');
-    const user = localStorage.getItem('adminUser');
-    
-    console.log('🔍 Verificando login existente...', { 
-        hasToken: !!token, 
-        hasUser: !!user 
-    });
-    
-    // Se não tem token ou user, não faz nada
-    if (!token || !user) {
-        console.log('❌ Nenhum login detectado');
-        return;
-    }
-    
-    console.log('✅ Login detectado, verificando token...');
-    
-    // Timeout para evitar espera infinita
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 3000);
-    });
-    
-    // Verificação do token
-    const verificationPromise = fetch(`${API_BASE}/api/auth/me`, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-    });
-    
-    // Race entre a verificação e o timeout
-    Promise.race([verificationPromise, timeoutPromise])
-        .then(response => {
-            if (response.ok) {
-                console.log('🎯 Token válido, redirecionando...');
-                showSuccess('Login automático realizado! Redirecionando...');
-                
-                // Redirecionar após breve delay para mostrar mensagem
-                setTimeout(() => {
-                    window.location.replace('index.html');
-                }, 1000);
-            } else {
-                throw new Error('Token inválido');
-            }
-        })
-        .catch(error => {
-            console.log('❌ Erro na verificação:', error.message);
+        function checkExistingLogin() {
+            const token = localStorage.getItem('adminToken');
+            const user = localStorage.getItem('adminUser');
             
-            if (error.message.includes('Failed to fetch') || error.message === 'Timeout') {
-                console.log('🌐 Erro de rede/timeout, mantendo login local');
-                // Em caso de erro de rede, assumir que o token é válido
-                showSuccess('Conectando... Redirecionando...');
+            if (token && user) {
+                showSuccess('Login detectado. Redirecionando...');
                 setTimeout(() => {
-                    window.location.replace('index.html');
+                    window.location.href = 'index.html';
                 }, 1000);
-            } else {
-                // Token realmente inválido - limpar e permanecer
-                console.log('🗑️ Token inválido, limpando dados...');
-                localStorage.removeItem('adminToken');
-                localStorage.removeItem('adminUser');
             }
-        });
-}
+        }
 
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {

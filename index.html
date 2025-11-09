@@ -11,7 +11,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <h1>꧁༺ Xhacking ༻꧂</h1>
+                <h1>🎬 Seehere</h1>
             </div>
             <div class="nav-search">
                 <input type="text" id="searchInput" placeholder="Buscar vídeos...">
@@ -37,37 +37,41 @@
 
             <section class="featured-collections">
                 <h3>Coleções em Destaque</h3>
-                <div id="featuredCollections" class="collections-grid"></div>
+                <div id="featuredCollections" class="collections-grid">
+                    <div class="loading">Carregando coleções...</div>
+                </div>
             </section>
 
             <section class="videos-section">
                 <h3>Vídeos Recentes</h3>
-                <div id="videosGrid" class="videos-grid"></div>
-                <button id="loadMore" onclick="loadMoreVideos()">Carregar Mais</button>
+                <div id="videosGrid" class="videos-grid">
+                    <div class="loading">Carregando vídeos...</div>
+                </div>
+                <button id="loadMore" onclick="loadMoreVideos()" style="display: none;">Carregar Mais</button>
             </section>
         </div>
 
         <div id="videoPage" class="page">
             <div class="video-container">
                 <div class="video-player-section">
-                    <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto">
+                    <video id="videoPlayer" class="video-js vjs-default-skin" controls preload="auto" width="640" height="360">
                         <p class="vjs-no-js">
                             Para ver este vídeo, habilite o JavaScript e considere atualizar para um navegador que
                             <a href="https://videojs.com/html5-video-support/" target="_blank">suporte vídeo HTML5</a>.
                         </p>
                     </video>
                     <div class="video-info">
-                        <h1 id="videoTitle"></h1>
+                        <h1 id="videoTitle">Título do Vídeo</h1>
                         <div class="video-meta">
-                            <span id="videoViews"></span>
-                            <span id="videoDate"></span>
+                            <span id="videoViews">0 visualizações</span>
+                            <span id="videoDate">Data</span>
                             <div class="video-actions">
                                 <button id="likeBtn" onclick="toggleLike()">❤️ <span id="likeCount">0</span></button>
                                 <button onclick="shareVideo()">📤 Compartilhar</button>
                                 <button id="downloadBtn" onclick="downloadVideo()">⬇️ Download</button>
                             </div>
                         </div>
-                        <p id="videoDescription"></p>
+                        <p id="videoDescription">Descrição do vídeo...</p>
                         <div id="videoTags" class="tags"></div>
                     </div>
                 </div>
@@ -75,7 +79,9 @@
                 <div class="video-sidebar">
                     <div class="heatmap-section">
                         <h4>Parte Mais Repetida</h4>
-                        <div id="heatmap" class="heatmap"></div>
+                        <div id="heatmap" class="heatmap">
+                            <p>Dados de heatmap aparecerão aqui</p>
+                        </div>
                     </div>
                     <div class="collections-section">
                         <h4>Coleções</h4>
@@ -86,7 +92,9 @@
 
             <div class="comments-section">
                 <h3>Comentários</h3>
-                <div id="commentsList" class="comments-list"></div>
+                <div id="commentsList" class="comments-list">
+                    <p>Carregando comentários...</p>
+                </div>
                 <div class="add-comment">
                     <textarea id="commentText" placeholder="Adicione um comentário..."></textarea>
                     <button onclick="addComment()">Comentar</button>
@@ -104,6 +112,11 @@
                     <input type="password" id="loginPassword" placeholder="Senha" required>
                     <button type="submit">Entrar</button>
                 </form>
+                <div class="demo-credentials" style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                        <strong>Demo:</strong> admin@seehere.com / admin123
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -112,7 +125,7 @@
                 <span class="close" onclick="closeModals()">&times;</span>
                 <h2>Cadastrar</h2>
                 <form id="signupForm">
-                    <input type="text" id="signupName" placeholder="Nome de exibição">
+                    <input type="text" id="signupName" placeholder="Nome de exibição" required>
                     <input type="email" id="signupEmail" placeholder="Email" required>
                     <input type="password" id="signupPassword" placeholder="Senha" required>
                     <button type="submit">Cadastrar</button>
@@ -122,6 +135,6 @@
     </main>
 
     <script src="https://vjs.zencdn.net/8.5.2/video.min.js"></script>
-    <script type="module" src="main.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
