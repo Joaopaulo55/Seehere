@@ -2,11 +2,24 @@
   publish = "."
   command = "echo 'No build command'"
 
+# Frontend - arquivos na raiz
 [[redirects]]
   from = "/"
-  to = "/public/index.html"
+  to = "/index.html"
   status = 200
 
+# CSS e JS do frontend (na raiz)
+[[redirects]]
+  from = "/style.css"
+  to = "/style.css"
+  status = 200
+
+[[redirects]]
+  from = "/main.js"
+  to = "/main.js"
+  status = 200
+
+# Painel - mantém as configurações originais
 [[redirects]]
   from = "/painel"
   to = "/painel/index.html"
@@ -22,12 +35,14 @@
   to = "/painel/index.html"
   status = 200
 
-  [[redirects]]
-  from = "/src/*"
-  to = "/public/src/:splat"
-  status = 200
-
+# CSS e JS do painel
 [[redirects]]
   from = "/painel/src/*"
   to = "/painel/src/:splat"
+  status = 200
+
+# Para qualquer outro arquivo na raiz
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
