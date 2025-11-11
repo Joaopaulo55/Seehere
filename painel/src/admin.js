@@ -27,6 +27,129 @@ function initializeAdmin() {
     loadTheme();
 }
 
+// Adicione esta função para mostrar progresso
+function showUploadProgress(percent) {
+    const progressElement = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    
+    if (progressElement && progressFill && progressText) {
+        progressElement.style.display = 'block';
+        progressFill.style.width = `${percent}%`;
+        progressText.textContent = `${Math.round(percent)}%`;
+    }
+}
+
+function hideUploadProgress() {
+    const progressElement = document.getElementById('uploadProgress');
+    if (progressElement) {
+        progressElement.style.display = 'none';
+    }
+}
+
+// Atualize a função handleAddVideo com progresso
+async function handleAddVideo(e) {
+    e.preventDefault();
+    
+    const videoFile = document.getElementById('videoFile').files[0];
+    if (!videoFile) {
+        showNotification('Selecione um arquivo de vídeo', 'error');
+        return;
+    }
+
+    // Validar tamanho do arquivo (500MB)
+    if (videoFile.size > 500 * 1024 * 1024) {
+        showNotification('Arquivo muito grande. Máximo: 500MB', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    formData.append('title', document.getElementById('videoTitle').value);
+    formData.append('description', document.getElementById('videoDescription').value);
+    formData.append('tags', document.getElementById('videoTags').value);
+    
+    const collectionId = document.getElementById('videoCollection').value;
+    if (collectionId) {
+        formData.append('collectionId', collectionId);
+    }
+
+    showLoading();
+    showUploadProgress(0);
+
+    try {
+        // Simular progresso (em produção, use XMLHttpRequest para progresso real)
+        const progressInterval = setInterval(() => {
+            const currentProgress = parseInt(document.getElementById('progressFill').style.width) || 0;
+            if (currentProgress < 90) {
+                showUploadProgress(currentProgress + 10);
+            }
+        }, 500);
+
+        const response = await fetch(`${API_BASE}/api/upload/video`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+            },
+            body: formData
+        });
+
+        clearInterval(progressInterval);
+        showUploadProgress(100);
+
+        if (response.ok) {
+            const result = await response.json();
+            showNotification('✅ Vídeo enviado com sucesso!', 'success');
+            closeModal('addVideoModal');
+            document.getElementById('addVideoForm').reset();
+            hideUploadProgress();
+            loadVideos();
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao enviar vídeo');
+        }
+    } catch (error) {
+        console.error('Erro ao enviar vídeo:', error);
+        showNotification(`❌ ${error.message}`, 'error');
+        hideUploadProgress();
+    } finally {
+        hideLoading();
+    }
+}
+async function loadCollectionsForModal() {
+    try {
+        const response = await fetch(`${API_BASE}/api/collections`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const select = document.getElementById('videoCollection');
+            
+            if (select && data.collections) {
+                // Manter a opção "Nenhuma coleção"
+                select.innerHTML = '<option value="">Nenhuma coleção</option>';
+                
+                data.collections.forEach(collection => {
+                    const option = document.createElement('option');
+                    option.value = collection.id;
+                    option.textContent = collection.name;
+                    select.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar coleções:', error);
+    }
+}
+
+// Atualize a função showAddVideoModal
+function showAddVideoModal() {
+    document.getElementById('addVideoModal').style.display = 'block';
+    loadCollectionsForModal();
+}
+
+
 function checkCurrentRoute() {
     const currentPath = window.location.pathname;
     console.log('📍 Rota atual:', currentPath);
@@ -862,39 +985,36 @@ function closeModal(modalId) {
 async function handleAddVideo(e) {
     e.preventDefault();
     
-    const formData = {
-        title: document.getElementById('videoTitle').value,
-        description: document.getElementById('videoDescription').value,
-        urlStream: document.getElementById('videoUrl').value,
-        urlDownload: document.getElementById('videoDownloadUrl').value || document.getElementById('videoUrl').value,
-        thumbnailUrl: document.getElementById('videoThumbnail').value,
-        durationSeconds: parseInt(document.getElementById('videoDuration').value) || 0,
-        tags: document.getElementById('videoTags').value.split(',').map(tag => tag.trim()).filter(tag => tag)
-    };
+    const formData = new FormData();
+    formData.append('video', document.getElementById('videoFile').files[0]);
+    formData.append('title', document.getElementById('videoTitle').value);
+    formData.append('description', document.getElementById('videoDescription').value);
+    formData.append('tags', document.getElementById('videoTags').value);
     
     showLoading();
     
     try {
-        const response = await fetch(`${API_BASE}/api/videos`, {
+        const response = await fetch(`${API_BASE}/api/upload/video`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
+                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                // Não usar Content-Type: multipart/form-data é definido automaticamente
             },
-            body: JSON.stringify(formData)
+            body: formData
         });
         
         if (response.ok) {
-            showNotification('Vídeo adicionado com sucesso!', 'success');
+            const result = await response.json();
+            showNotification('Vídeo enviado com sucesso!', 'success');
             closeModal('addVideoModal');
             document.getElementById('addVideoForm').reset();
             loadVideos();
         } else {
             const error = await response.json();
-            throw new Error(error.error || 'Erro ao adicionar vídeo');
+            throw new Error(error.error || 'Erro ao enviar vídeo');
         }
     } catch (error) {
-        console.error('Erro ao adicionar vídeo:', error);
+        console.error('Erro ao enviar vídeo:', error);
         showNotification(error.message, 'error');
     } finally {
         hideLoading();
@@ -1380,6 +1500,59 @@ const dynamicStyles = `
 .loading-spinner i {
     font-size: 2rem;
     margin-bottom: 1rem;
+}
+
+
+.upload-progress {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.progress-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-align: center;
+    display: block;
+}
+
+/* Estilos para o input de arquivo */
+.form-group input[type="file"] {
+    padding: 0.5rem;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+    width: 100%;
+    cursor: pointer;
+}
+
+.form-group input[type="file"]:hover {
+    border-color: #007bff;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
 }
 `;
 
