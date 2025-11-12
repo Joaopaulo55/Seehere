@@ -982,40 +982,65 @@ function closeModal(modalId) {
 }
 
 // Form Handlers
+// admin.js - Função de Upload Corrigida
 async function handleAddVideo(e) {
     e.preventDefault();
     
+    const videoFile = document.getElementById('videoFile').files[0];
+    if (!videoFile) {
+        showNotification('Selecione um arquivo de vídeo', 'error');
+        return;
+    }
+
+    // Validar tipo de arquivo
+    if (!videoFile.type.startsWith('video/')) {
+        showNotification('Apenas arquivos de vídeo são permitidos', 'error');
+        return;
+    }
+
     const formData = new FormData();
-    formData.append('video', document.getElementById('videoFile').files[0]);
+    formData.append('video', videoFile);
     formData.append('title', document.getElementById('videoTitle').value);
     formData.append('description', document.getElementById('videoDescription').value);
     formData.append('tags', document.getElementById('videoTags').value);
     
+    const collectionId = document.getElementById('videoCollection').value;
+    if (collectionId) {
+        formData.append('collectionId', collectionId);
+    }
+
     showLoading();
-    
+    showUploadProgress(10);
+
     try {
         const response = await fetch(`${API_BASE}/api/upload/video`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-                // Não usar Content-Type: multipart/form-data é definido automaticamente
             },
             body: formData
         });
-        
+
         if (response.ok) {
             const result = await response.json();
-            showNotification('Vídeo enviado com sucesso!', 'success');
-            closeModal('addVideoModal');
-            document.getElementById('addVideoForm').reset();
-            loadVideos();
+            showUploadProgress(100);
+            showNotification('✅ Vídeo enviado com sucesso!', 'success');
+            
+            setTimeout(() => {
+                closeModal('addVideoModal');
+                document.getElementById('addVideoForm').reset();
+                hideUploadProgress();
+                loadVideos();
+            }, 1000);
+            
         } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao enviar vídeo');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao enviar vídeo');
         }
     } catch (error) {
         console.error('Erro ao enviar vídeo:', error);
-        showNotification(error.message, 'error');
+        showNotification(`❌ ${error.message}`, 'error');
+        hideUploadProgress();
     } finally {
         hideLoading();
     }
