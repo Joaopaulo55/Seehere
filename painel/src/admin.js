@@ -143,6 +143,194 @@ async function loadCollectionsForModal() {
     }
 }
 
+// Adicione estas funções ao arquivo admin.js do frontend
+
+// Nova página para gerenciar vídeos do MEGA
+function showMegaVideosPage() {
+    showPage('megaVideos');
+    loadMegaVideos();
+}
+
+async function loadMegaVideos() {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/mega-videos`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateMegaVideosUI(data);
+        } else {
+            throw new Error('Falha ao carregar vídeos do MEGA');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar vídeos do MEGA:', error);
+        showNotification('Erro ao carregar vídeos do MEGA', 'error');
+        updateMegaVideosUI({ notInDatabase: [], alreadyInDatabase: [] });
+    } finally {
+        hideLoading();
+    }
+}
+
+function updateMegaVideosUI(data) {
+    const notImportedContainer = document.getElementById('megaNotImported');
+    const importedContainer = document.getElementById('megaImported');
+    const statsContainer = document.getElementById('megaStats');
+    
+    if (!data.notInDatabase || !data.alreadyInDatabase) {
+        notImportedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
+        importedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
+        return;
+    }
+
+    // Stats
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <div class="stat-item">
+                <strong>Total no MEGA:</strong> ${data.stats?.totalInMega || 0}
+            </div>
+            <div class="stat-item">
+                <strong>Não importados:</strong> ${data.stats?.notImported || 0}
+            </div>
+            <div class="stat-item">
+                <strong>Já importados:</strong> ${data.stats?.alreadyImported || 0}
+            </div>
+        `;
+    }
+
+    // Not imported videos
+    if (data.notInDatabase.length === 0) {
+        notImportedContainer.innerHTML = '<div class="no-data">Nenhum vídeo não importado encontrado</div>';
+    } else {
+        notImportedContainer.innerHTML = data.notInDatabase.map(file => `
+            <div class="mega-file-card">
+                <div class="file-info">
+                    <h4>${file.name}</h4>
+                    <p>Tamanho: ${file.formattedSize}</p>
+                    <small>ID: ${file.downloadId}</small>
+                </div>
+                <div class="file-actions">
+                    <button class="btn btn-sm btn-primary" onclick="showImportModal('${file.downloadId}', '${file.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-download"></i> Importar
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Already imported videos
+    if (data.alreadyInDatabase.length === 0) {
+        importedContainer.innerHTML = '<div class="no-data">Nenhum vídeo importado encontrado</div>';
+    } else {
+        importedContainer.innerHTML = data.alreadyInDatabase.map(file => `
+            <div class="mega-file-card imported">
+                <div class="file-info">
+                    <h4>${file.existingTitle || file.name}</h4>
+                    <p>Arquivo: ${file.name}</p>
+                    <p>Tamanho: ${file.formattedSize}</p>
+                    <small>ID: ${file.downloadId}</small>
+                </div>
+                <div class="file-status">
+                    <span class="status-badge published">✅ Importado</span>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+function showImportModal(megaFileId, fileName) {
+    document.getElementById('importMegaFileId').value = megaFileId;
+    document.getElementById('importVideoTitle').value = fileName.replace(/\.[^/.]+$/, ""); // Remove extensão
+    document.getElementById('importFileName').textContent = fileName;
+    
+    // Carregar coleções para o select
+    loadCollectionsForImportModal();
+    
+    document.getElementById('importMegaVideoModal').style.display = 'block';
+}
+
+async function loadCollectionsForImportModal() {
+    try {
+        const response = await fetch(`${API_BASE}/api/collections`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const select = document.getElementById('importCollection');
+            
+            if (select && data.collections) {
+                select.innerHTML = '<option value="">Nenhuma coleção</option>';
+                
+                data.collections.forEach(collection => {
+                    const option = document.createElement('option');
+                    option.value = collection.id;
+                    option.textContent = collection.name;
+                    select.appendChild(option);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar coleções:', error);
+    }
+}
+
+async function handleImportMegaVideo(e) {
+    e.preventDefault();
+    
+    const megaFileId = document.getElementById('importMegaFileId').value;
+    const title = document.getElementById('importVideoTitle').value;
+    const description = document.getElementById('importVideoDescription').value;
+    const tags = document.getElementById('importVideoTags').value;
+    const thumbnailUrl = document.getElementById('importThumbnailUrl').value;
+    const collectionId = document.getElementById('importCollection').value;
+    
+    if (!title) {
+        showNotification('Título é obrigatório', 'error');
+        return;
+    }
+
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/import-mega-video`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                megaFileId,
+                title,
+                description,
+                tags,
+                thumbnailUrl,
+                collectionId
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification('✅ Vídeo importado com sucesso!', 'success');
+            closeModal('importMegaVideoModal');
+            loadMegaVideos(); // Recarregar a lista
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao importar vídeo');
+        }
+    } catch (error) {
+        console.error('Erro ao importar vídeo:', error);
+        showNotification(`❌ ${error.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Adicione também o HTML necessário para a nova página
+
+
 // Atualize a função showAddVideoModal
 function showAddVideoModal() {
     document.getElementById('addVideoModal').style.display = 'block';
@@ -983,69 +1171,55 @@ function closeModal(modalId) {
 
 // Form Handlers
 // admin.js - Função de Upload Corrigida
-async function handleAddVideo(e) {
+async function handleAddCollection(e) {
     e.preventDefault();
     
-    const videoFile = document.getElementById('videoFile').files[0];
-    if (!videoFile) {
-        showNotification('Selecione um arquivo de vídeo', 'error');
-        return;
-    }
-
-    // Validar tipo de arquivo
-    if (!videoFile.type.startsWith('video/')) {
-        showNotification('Apenas arquivos de vídeo são permitidos', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('video', videoFile);
-    formData.append('title', document.getElementById('videoTitle').value);
-    formData.append('description', document.getElementById('videoDescription').value);
-    formData.append('tags', document.getElementById('videoTags').value);
+    const formData = {
+        name: document.getElementById('collectionName').value,
+        description: document.getElementById('collectionDescription').value,
+        thumbnailUrl: document.getElementById('collectionThumbnail').value || null
+    };
     
-    const collectionId = document.getElementById('videoCollection').value;
-    if (collectionId) {
-        formData.append('collectionId', collectionId);
+    if (!formData.name) {
+        showNotification('Nome da coleção é obrigatório', 'error');
+        return;
     }
-
+    
     showLoading();
-    showUploadProgress(10);
-
+    
     try {
-        const response = await fetch(`${API_BASE}/api/upload/video`, {
+        console.log('📤 Enviando dados para criar coleção:', formData);
+        
+        const response = await fetch(`${API_BASE}/api/collections`, {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
             },
-            body: formData
+            body: JSON.stringify(formData)
         });
-
+        
+        console.log('📥 Resposta do servidor:', response.status);
+        
         if (response.ok) {
             const result = await response.json();
-            showUploadProgress(100);
-            showNotification('✅ Vídeo enviado com sucesso!', 'success');
-            
-            setTimeout(() => {
-                closeModal('addVideoModal');
-                document.getElementById('addVideoForm').reset();
-                hideUploadProgress();
-                loadVideos();
-            }, 1000);
-            
+            console.log('✅ Coleção criada:', result);
+            showNotification('Coleção criada com sucesso!', 'success');
+            closeModal('addCollectionModal');
+            document.getElementById('addCollectionForm').reset();
+            loadCollections();
         } else {
             const errorData = await response.json();
-            throw new Error(errorData.error || 'Erro ao enviar vídeo');
+            console.error('❌ Erro do servidor:', errorData);
+            throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
         }
     } catch (error) {
-        console.error('Erro ao enviar vídeo:', error);
+        console.error('❌ Erro ao criar coleção:', error);
         showNotification(`❌ ${error.message}`, 'error');
-        hideUploadProgress();
     } finally {
         hideLoading();
     }
 }
-
 async function handleAddCollection(e) {
     e.preventDefault();
     

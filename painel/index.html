@@ -31,6 +31,16 @@
                         <span>Vídeos</span>
                     </a>
                 </li>
+                <!-- Adicione este item ao sidebar-nav no index.html do admin -->
+<li class="nav-item">
+    <a href="#megaVideos" class="nav-link">
+        <i class="fas fa-cloud-download-alt"></i>
+        <span>Vídeos no MEGA</span>
+    </a>
+</li>
+                
+                
+                
                 <li class="nav-item">
                     <a href="#collections" class="nav-link">
                         <i class="fas fa-folder"></i>
@@ -269,6 +279,94 @@
                     </div>
                 </div>
 
+                
+                <!-- Adicione este código ao content-pages no index.html do admin -->
+
+<!-- Mega Videos Page -->
+<div id="megaVideos" class="content-page">
+    <div class="page-header">
+        <h2>Vídeos no MEGA</h2>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="loadMegaVideos()">
+                <i class="fas fa-sync-alt"></i> Atualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="mega-stats" id="megaStats">
+        <!-- Estatísticas serão carregadas via JS -->
+    </div>
+
+    <div class="mega-tabs">
+        <div class="tab-section">
+            <h3>Vídeos Não Importados <span id="notImportedCount" class="count-badge">0</span></h3>
+            <div id="megaNotImported" class="mega-files-grid">
+                <!-- Vídeos não importados serão carregados via JS -->
+            </div>
+        </div>
+
+        <div class="tab-section">
+            <h3>Vídeos Já Importados <span id="importedCount" class="count-badge">0</span></h3>
+            <div id="megaImported" class="mega-files-grid">
+                <!-- Vídeos importados serão carregados via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Mega Video Modal -->
+<div id="importMegaVideoModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Importar Vídeo do MEGA</h3>
+            <span class="close" onclick="closeModal('importMegaVideoModal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="importMegaVideoForm">
+                <input type="hidden" id="importMegaFileId">
+                
+                <div class="form-group">
+                    <label>Arquivo:</label>
+                    <p id="importFileName" class="file-name"></p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Título do Vídeo *</label>
+                    <input type="text" id="importVideoTitle" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea id="importVideoDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tags (separadas por vírgula)</label>
+                    <input type="text" id="importVideoTags" placeholder="tag1, tag2, tag3">
+                </div>
+                
+                <div class="form-group">
+                    <label>Thumbnail URL (opcional)</label>
+                    <input type="url" id="importThumbnailUrl" placeholder="https://...">
+                </div>
+                
+                <div class="form-group">
+                    <label>Coleção (opcional)</label>
+                    <select id="importCollection">
+                        <option value="">Nenhuma coleção</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('importMegaVideoModal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Importar Vídeo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+                
+                
                 <!-- Settings Page -->
                 <div id="settings" class="content-page">
                     <div class="page-header">
