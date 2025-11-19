@@ -48,6 +48,70 @@ body {
     transition: var(--transition);
 }
 
+.mega-setup-card {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.folder-input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.mega-files-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.mega-file-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.mega-file-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.mega-file-card.imported {
+    opacity: 0.7;
+    background: var(--bg-secondary);
+}
+
+.file-info h4 {
+    margin: 0 0 0.5rem 0;
+    word-break: break-word;
+}
+
+.file-info p {
+    margin: 0.2rem 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.file-actions {
+    margin-top: 1rem;
+}
+
+.count-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+
 
 /* Adicione ao style.css do admin */
 .mega-stats {

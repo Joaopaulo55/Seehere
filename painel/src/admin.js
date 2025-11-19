@@ -3,6 +3,7 @@ const API_BASE = 'https://seehere-backend.onrender.com';
 let currentUser = null;
 let currentPage = 1;
 let totalPages = 1;
+let currentMegaFolderUrl = '';
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
@@ -26,6 +27,239 @@ function initializeAdmin() {
     setupNavigation();
     loadTheme();
 }
+
+
+
+
+// Nova página para gerenciar vídeos do MEGA
+function showMegaVideosPage() {
+    showPage('megaVideos');
+    document.getElementById('megaFolderUrl').value = currentMegaFolderUrl;
+    
+    if (currentMegaFolderUrl) {
+        loadMegaVideos();
+    }
+}
+
+// Scan de pasta MEGA
+async function scanMegaFolder() {
+    const folderUrl = document.getElementById('megaFolderUrl').value.trim();
+    
+    if (!folderUrl) {
+        showNotification('Cole a URL da pasta MEGA', 'error');
+        return;
+    }
+
+    // Validar formato da URL
+    if (!folderUrl.includes('mega.nz/folder/') || !folderUrl.includes('#')) {
+        showNotification('URL inválida. Formato: https://mega.nz/folder/ID#CHAVE', 'error');
+        return;
+    }
+
+    showLoading();
+    currentMegaFolderUrl = folderUrl;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/scan-mega-folder`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ folderUrl })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Falha no scan da pasta');
+        }
+
+        updateMegaVideosUI(data);
+        showNotification(`✅ Encontrados ${data.stats.totalInMega} vídeos`, 'success');
+
+    } catch (error) {
+        console.error('Erro ao escanear pasta MEGA:', error);
+        showNotification(`❌ ${error.message}`, 'error');
+        updateMegaVideosUI({ notInDatabase: [], alreadyInDatabase: [] });
+    } finally {
+        hideLoading();
+    }
+}
+
+// Carregar vídeos do MEGA (usado quando já tem URL salva)
+async function loadMegaVideos() {
+    if (!currentMegaFolderUrl) return;
+    await scanMegaFolder();
+}
+
+function updateMegaVideosUI(data) {
+    const notImportedContainer = document.getElementById('megaNotImported');
+    const importedContainer = document.getElementById('megaImported');
+    const statsContainer = document.getElementById('megaStats');
+    
+    if (!data.notInDatabase || !data.alreadyInDatabase) {
+        notImportedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
+        importedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
+        return;
+    }
+
+    // Stats
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <div class="stat-item">
+                <strong>Total no MEGA:</strong> ${data.stats?.totalInMega || 0}
+            </div>
+            <div class="stat-item">
+                <strong>Não importados:</strong> ${data.stats?.notImported || 0}
+            </div>
+            <div class="stat-item">
+                <strong>Já importados:</strong> ${data.stats?.alreadyImported || 0}
+            </div>
+            <div class="stat-item">
+                <strong>Pasta:</strong> <span style="word-break: break-all; font-size: 0.9rem;">${currentMegaFolderUrl}</span>
+            </div>
+        `;
+    }
+
+    // Not imported videos
+    if (data.notInDatabase.length === 0) {
+        notImportedContainer.innerHTML = '<div class="no-data">Nenhum vídeo não importado encontrado</div>';
+    } else {
+        notImportedContainer.innerHTML = data.notInDatabase.map(file => `
+            <div class="mega-file-card">
+                <div class="file-info">
+                    <h4>${file.name}</h4>
+                    <p>📏 Tamanho: ${file.formattedSize}</p>
+                    <p>🆔 ID: ${file.downloadId}</p>
+                    <small>📅 ${new Date(file.timestamp).toLocaleDateString('pt-BR')}</small>
+                </div>
+                <div class="file-actions">
+                    <button class="btn btn-sm btn-primary" onclick="showImportModal(
+                        '${file.downloadId}', 
+                        '${file.downloadUrl}',
+                        '${file.name.replace(/'/g, "\\'")}',
+                        ${file.size}
+                    )">
+                        <i class="fas fa-download"></i> Importar
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Already imported videos
+    if (data.alreadyInDatabase.length === 0) {
+        importedContainer.innerHTML = '<div class="no-data">Nenhum vídeo importado encontrado</div>';
+    } else {
+        importedContainer.innerHTML = data.alreadyInDatabase.map(file => `
+            <div class="mega-file-card imported">
+                <div class="file-info">
+                    <h4>${file.existingTitle || file.name}</h4>
+                    <p>📁 Arquivo: ${file.name}</p>
+                    <p>📏 Tamanho: ${file.formattedSize}</p>
+                    <p>🆔 ID: ${file.downloadId}</p>
+                    <small>📅 ${new Date(file.timestamp).toLocaleDateString('pt-BR')}</small>
+                </div>
+                <div class="file-status">
+                    <span class="status-badge published">✅ Importado</span>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+function showImportModal(megaFileId, downloadUrl, fileName, fileSize) {
+    document.getElementById('importMegaFileId').value = megaFileId;
+    document.getElementById('importDownloadUrl').value = downloadUrl;
+    document.getElementById('importFileName').textContent = fileName;
+    document.getElementById('importFileSize').textContent = `Tamanho: ${formatBytes(fileSize)}`;
+    
+    // Sugerir título baseado no nome do arquivo (sem extensão)
+    const suggestedTitle = fileName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ');
+    document.getElementById('importVideoTitle').value = suggestedTitle;
+    
+    // Carregar coleções para o select
+    loadCollectionsForImportModal();
+    
+    document.getElementById('importMegaVideoModal').style.display = 'block';
+}
+
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+async function handleImportMegaVideo(e) {
+    e.preventDefault();
+    
+    const megaFileId = document.getElementById('importMegaFileId').value;
+    const downloadUrl = document.getElementById('importDownloadUrl').value;
+    const fileName = document.getElementById('importFileName').textContent;
+    const title = document.getElementById('importVideoTitle').value;
+    const description = document.getElementById('importVideoDescription').value;
+    const tags = document.getElementById('importVideoTags').value;
+    const thumbnailUrl = document.getElementById('importThumbnailUrl').value;
+    const collectionId = document.getElementById('importCollection').value;
+    
+    // Extrair tamanho do texto
+    const sizeText = document.getElementById('importFileSize').textContent;
+    const sizeMatch = sizeText.match(/[\d.]+/);
+    const size = sizeMatch ? parseFloat(sizeMatch[0]) * 1024 * 1024 : 0; // Assumindo MB
+
+    if (!title) {
+        showNotification('Título é obrigatório', 'error');
+        return;
+    }
+
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/mega/import-video`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                megaFileId,
+                downloadUrl,
+                name: fileName,
+                title,
+                description,
+                tags,
+                thumbnailUrl,
+                collectionId,
+                size
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showNotification('✅ Vídeo importado com sucesso!', 'success');
+            closeModal('importMegaVideoModal');
+            loadMegaVideos(); // Recarregar a lista
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao importar vídeo');
+        }
+    } catch (error) {
+        console.error('Erro ao importar vídeo:', error);
+        showNotification(`❌ ${error.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+
+
 
 // Adicione esta função para mostrar progresso
 function showUploadProgress(percent) {
