@@ -402,32 +402,26 @@
 
         // Verificar se já está logado - VERSÃO CORRIGIDA
         function checkExistingLogin() {
-            const token = localStorage.getItem('adminToken');
-            const user = localStorage.getItem('adminUser');
-            
-            console.log('🔍 Verificando login existente...', { 
-                hasToken: !!token, 
-                hasUser: !!user 
-            });
-            
-            // Se não tem token ou user, não faz nada
-            if (!token || !user) {
-                console.log('❌ Nenhum login detectado');
-                return;
-            }
-            
-            console.log('✅ Login detectado, redirecionando para painel...');
-            
-            // Redirecionar IMEDIATAMENTE se já tiver token e user
-            // A verificação do token será feita no painel admin
-            showSuccess('Redirecionando para o painel...');
-            
-            // Redirecionar após breve delay para mostrar mensagem
-            setTimeout(() => {
-                window.location.replace('index.html');
-            }, 500);
-        }
-
+    const token = localStorage.getItem('adminToken');
+    const user = localStorage.getItem('adminUser');
+    
+    console.log('🔍 Verificando login existente...', { 
+        hasToken: !!token, 
+        hasUser: !!user 
+    });
+    
+    // ⚠️ REMOVA ou COMENTE o redirecionamento automático
+    // if (token && user) {
+    //     console.log('✅ Login detectado, redirecionando para painel...');
+    //     showSuccess('Redirecionando para o painel...');
+    //     setTimeout(() => {
+    //         window.location.replace('index.html');
+    //     }, 500);
+    // }
+    
+    // Em vez disso, apenas preencha as credenciais
+    autoFillCredentials();
+}
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🔐 Admin Login Inicializado');
