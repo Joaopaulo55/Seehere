@@ -699,7 +699,7 @@ async function scanMegaFolder() {
     currentMegaFolderUrl = folderUrl;
 
     try {
-        const response = await fetch(`${API_BASE}/api/admin/scan-mega-folder`, {
+        const response = await fetch(`${API_BASE}/api/mega/scan-folder`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
