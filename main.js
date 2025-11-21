@@ -163,6 +163,7 @@ async function loadHomePage() {
     await loadVideos();
 }
 
+// ✅ CORRIGIDO: Agora pega coleções do backend corretamente
 async function loadFeaturedCollections() {
     try {
         const grid = document.getElementById('featuredCollections');
@@ -179,9 +180,14 @@ async function loadFeaturedCollections() {
         if (data.collections && data.collections.length > 0) {
             grid.innerHTML = data.collections.map(collection => `
                 <div class="collection-card" onclick="viewCollection('${collection.id}')">
-                    <img src="${collection.thumbnailUrl || 'https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'}" alt="${collection.name}" onerror="this.src='https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'">
+                    <img src="${collection.thumbnailUrl || 'https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'}" 
+                         alt="${collection.name}" 
+                         onerror="this.src='https://via.placeholder.com/300x200/007bff/ffffff?text=Seehere'">
                     <h4>${collection.name}</h4>
                     <p>${collection.description || 'Coleção de vídeos'}</p>
+                    <div class="collection-stats">
+                        <span>${collection._count?.videos || 0} vídeos</span>
+                    </div>
                 </div>
             `).join('');
         } else {
@@ -194,6 +200,7 @@ async function loadFeaturedCollections() {
     }
 }
 
+// ✅ CORRIGIDO: Agora pega vídeos do backend corretamente
 async function loadVideos(page = 1) {
     try {
         const grid = document.getElementById('videosGrid');
@@ -251,6 +258,69 @@ async function loadVideos(page = 1) {
     }
 }
 
+// ✅ CORRIGIDO: Função para visualizar coleção
+async function viewCollection(collectionId) {
+    try {
+        showNotification('Carregando coleção...', 'info');
+        
+        const response = await fetch(`${API_BASE}/api/collections/${collectionId}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load collection');
+        }
+        
+        const data = await response.json();
+        const collection = data.collection;
+        
+        // Criar uma página temporária para mostrar os vídeos da coleção
+        showCollectionPage(collection);
+        
+    } catch (error) {
+        console.error('Failed to load collection:', error);
+        showNotification('Erro ao carregar coleção', 'error');
+    }
+}
+
+function showCollectionPage(collection) {
+    // Criar HTML temporário para a coleção
+    const tempHTML = `
+        <div class="collection-page">
+            <button onclick="loadHomePage()" class="back-button">← Voltar</button>
+            <div class="collection-header">
+                <h1>${collection.name}</h1>
+                <p>${collection.description || ''}</p>
+                <div class="collection-meta">
+                    <span>${collection._count?.videos || 0} vídeos</span>
+                    <span>Criado por: ${collection.createdBy?.displayName || 'Sistema'}</span>
+                </div>
+            </div>
+            <div class="collection-videos-grid" id="collectionVideosGrid">
+                ${collection.videos && collection.videos.length > 0 ? 
+                    collection.videos.map(cv => `
+                        <div class="video-card" onclick="viewVideo('${cv.video.id}')">
+                            <img src="${cv.video.thumbnailUrl || 'https://via.placeholder.com/280x160/007bff/ffffff?text=Video'}" 
+                                 alt="${cv.video.title}"
+                                 onerror="this.src='https://via.placeholder.com/280x160/007bff/ffffff?text=Video'">
+                            <div class="video-info">
+                                <h4>${cv.video.title}</h4>
+                                <p>${cv.video.owner?.displayName || 'Usuário'}</p>
+                                <div class="video-stats">
+                                    <span>👁️ ${cv.video.viewsCount || 0}</span>
+                                    <span>❤️ ${cv.video.likesCount || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') : 
+                    '<div class="no-data">Nenhum vídeo nesta coleção</div>'
+                }
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('homePage').innerHTML = tempHTML;
+    showPage('homePage');
+}
+
 async function viewVideo(videoId) {
     try {
         showNotification('Carregando vídeo...', 'info');
@@ -303,7 +373,7 @@ function showVideoPage() {
     const collectionsContainer = document.getElementById('videoCollections');
     if (currentVideo.collections && currentVideo.collections.length > 0) {
         collectionsContainer.innerHTML = currentVideo.collections.map(cv => 
-            `<span class="collection-tag">${cv.collection.name}</span>`
+            `<span class="collection-tag" onclick="viewCollection('${cv.collection.id}')">${cv.collection.name}</span>`
         ).join('');
     } else {
         collectionsContainer.innerHTML = '<span class="collection-tag">Nenhuma coleção</span>';
@@ -499,15 +569,56 @@ function shareVideo() {
     }
 }
 
-// Search Functionality
-function searchVideos() {
+// ✅ MELHORADO: Busca funcional
+async function searchVideos() {
     const searchTerm = document.getElementById('searchInput').value.trim();
     if (searchTerm) {
         showNotification(`Buscando por: ${searchTerm}`, 'info');
-        // Implementar busca real aqui
-        // Por enquanto, apenas recarrega os vídeos
+        
+        try {
+            const response = await fetch(`${API_BASE}/api/videos?search=${encodeURIComponent(searchTerm)}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                updateSearchResults(data.videos || []);
+            } else {
+                throw new Error('Falha na busca');
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            showNotification('Erro na busca', 'error');
+        }
+    } else {
+        // Se busca vazia, recarrega vídeos normais
         loadVideos();
     }
+}
+
+function updateSearchResults(videos) {
+    const grid = document.getElementById('videosGrid');
+    const loadMoreBtn = document.getElementById('loadMore');
+    
+    if (videos.length > 0) {
+        grid.innerHTML = videos.map(video => `
+            <div class="video-card" onclick="viewVideo('${video.id}')">
+                <img src="${video.thumbnailUrl || 'https://via.placeholder.com/280x160/007bff/ffffff?text=Video'}" 
+                     alt="${video.title}"
+                     onerror="this.src='https://via.placeholder.com/280x160/007bff/ffffff?text=Video'">
+                <div class="video-info">
+                    <h4>${video.title}</h4>
+                    <p>${video.owner?.displayName || 'Usuário'}</p>
+                    <div class="video-stats">
+                        <span>👁️ ${video.viewsCount || 0}</span>
+                        <span>❤️ ${video.likesCount || 0}</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        grid.innerHTML = '<div class="no-data">Nenhum vídeo encontrado</div>';
+    }
+    
+    loadMoreBtn.style.display = 'none';
 }
 
 // Utility Functions
@@ -591,10 +702,7 @@ window.downloadVideo = downloadVideo;
 window.shareVideo = shareVideo;
 window.searchVideos = searchVideos;
 window.loadMoreVideos = () => loadVideos(currentVideoPage + 1);
-window.viewCollection = (collectionId) => {
-    showNotification(`Abrindo coleção ${collectionId}`, 'info');
-    // Implementar visualização de coleção
-};
+window.viewCollection = viewCollection;
 
 // Close modals when clicking outside
 window.addEventListener('click', (event) => {
@@ -606,7 +714,7 @@ window.addEventListener('click', (event) => {
     });
 });
 
-// Add CSS for animations
+// Add CSS for animations and new styles
 const style = document.createElement('style');
 style.textContent = `
     @keyframes slideInRight {
@@ -629,6 +737,44 @@ style.textContent = `
     
     .error {
         color: #dc3545;
+    }
+    
+    .collection-stats {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+    
+    .back-button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-bottom: 1rem;
+    }
+    
+    .collection-header {
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .collection-meta {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 1rem;
+        color: var(--text-muted);
+    }
+    
+    .collection-tag {
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    
+    .collection-tag:hover {
+        opacity: 0.8;
     }
 `;
 document.head.appendChild(style);

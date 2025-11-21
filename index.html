@@ -3,51 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Seehere - Streaming Platform</title>
+    <title>XPIPOKA - Streaming Platform</title>
     <link href="https://vjs.zencdn.net/8.5.2/video-js.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Estilos adicionais para o hero com vídeo de fundo */
+        .hero-with-bg {
+            position: relative;
+            height: 70vh;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .hero-bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+        }
+        
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(0, 0, 0, 0.3) 0%,
+                rgba(0, 0, 0, 0.7) 70%,
+                rgba(0, 0, 0, 0.9) 100%
+            );
+            z-index: -1;
+        }
+        
+        .hero-content {
+            max-width: 800px;
+            padding: 2rem;
+            z-index: 1;
+        }
+        
+        .hero-content h2 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+        }
+        
+        .hero-content p {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.7);
+        }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2rem;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            font-size: 1.2rem;
+            font-weight: 600;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+        }
+        
+        .cta-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Ajustes para o logo */
+        .nav-logo h1 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .logo-icon {
+            font-size: 1.8rem;
+        }
+        
+        /* Ajustes para ícones nos botões */
+        .btn-icon {
+            margin-right: 0.5rem;
+        }
+        
+        /* Estilos para a página de coleção */
+        .collection-page {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        
+        .collection-header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .collection-meta {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1rem;
+            color: var(--text-muted);
+        }
+        
+        .collection-videos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        /* Responsividade para o hero */
+        @media (max-width: 768px) {
+            .hero-content h2 {
+                font-size: 2.5rem;
+            }
+            
+            .hero-content p {
+                font-size: 1.2rem;
+            }
+            
+            .hero-with-bg {
+                height: 60vh;
+                min-height: 400px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .hero-content h2 {
+                font-size: 2rem;
+            }
+            
+            .hero-content p {
+                font-size: 1rem;
+            }
+            
+            .cta-button {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <h1>🎬 Seehere</h1>
+                <h1><i class="fas fa-play-circle logo-icon"></i> XPIPOKA</h1>
             </div>
             <div class="nav-search">
                 <input type="text" id="searchInput" placeholder="Buscar vídeos...">
-                <button onclick="searchVideos()">Buscar</button>
+                <button onclick="searchVideos()"><i class="fas fa-search btn-icon"></i>Buscar</button>
             </div>
             <div class="nav-auth" id="authSection">
-                <button onclick="showLogin()">Login</button>
-                <button onclick="showSignup()">Cadastrar</button>
+                <button onclick="showLogin()"><i class="fas fa-sign-in-alt btn-icon"></i>Login</button>
+                <button onclick="showSignup()"><i class="fas fa-user-plus btn-icon"></i>Cadastrar</button>
             </div>
             <div class="nav-user" id="userSection" style="display: none;">
                 <span id="userName"></span>
-                <button onclick="logout()">Sair</button>
+                <button onclick="logout()"><i class="fas fa-sign-out-alt btn-icon"></i>Sair</button>
             </div>
         </div>
     </nav>
 
     <main>
         <div id="homePage" class="page active">
-            <section class="hero">
-                <h2>Descubra vídeos incríveis</h2>
-                <p>Assista, compartilhe e interaja com a comunidade</p>
+            <!-- Hero Section com Vídeo de Fundo -->
+            <section class="hero-with-bg">
+                <video autoplay muted loop class="hero-bg-video">
+                    <source src="https://assets.mixkit.co/videos/preview/mixkit-white-sand-beach-and-palm-trees-1564-large.mp4" type="video/mp4">
+                    Seu navegador não suporta vídeos HTML5.
+                </video>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2>Descubra vídeos incríveis</h2>
+                    <p>Assista, compartilhe e interaja com a comunidade</p>
+                    <button class="cta-button" onclick="loadVideos()">
+                        <i class="fas fa-play btn-icon"></i>Explorar Agora
+                    </button>
+                </div>
             </section>
 
             <section class="featured-collections">
-                <h3>Coleções em Destaque</h3>
+                <h3><i class="fas fa-star btn-icon"></i>Coleções em Destaque</h3>
                 <div id="featuredCollections" class="collections-grid">
                     <div class="loading">Carregando coleções...</div>
                 </div>
             </section>
 
             <section class="videos-section">
-                <h3>Vídeos Recentes</h3>
+                <h3><i class="fas fa-video btn-icon"></i>Vídeos Recentes</h3>
                 <div id="videosGrid" class="videos-grid">
                     <div class="loading">Carregando vídeos...</div>
                 </div>
-                <button id="loadMore" onclick="loadMoreVideos()" style="display: none;">Carregar Mais</button>
+                <button id="loadMore" onclick="loadMoreVideos()" style="display: none;">
+                    <i class="fas fa-plus btn-icon"></i>Carregar Mais
+                </button>
             </section>
         </div>
 
@@ -63,12 +229,12 @@
                     <div class="video-info">
                         <h1 id="videoTitle">Título do Vídeo</h1>
                         <div class="video-meta">
-                            <span id="videoViews">0 visualizações</span>
-                            <span id="videoDate">Data</span>
+                            <span id="videoViews"><i class="fas fa-eye btn-icon"></i>0 visualizações</span>
+                            <span id="videoDate"><i class="fas fa-calendar btn-icon"></i>Data</span>
                             <div class="video-actions">
-                                <button id="likeBtn" onclick="toggleLike()">❤️ <span id="likeCount">0</span></button>
-                                <button onclick="shareVideo()">📤 Compartilhar</button>
-                                <button id="downloadBtn" onclick="downloadVideo()">⬇️ Download</button>
+                                <button id="likeBtn" onclick="toggleLike()"><i class="fas fa-heart btn-icon"></i> <span id="likeCount">0</span></button>
+                                <button onclick="shareVideo()"><i class="fas fa-share btn-icon"></i> Compartilhar</button>
+                                <button id="downloadBtn" onclick="downloadVideo()"><i class="fas fa-download btn-icon"></i> Download</button>
                             </div>
                         </div>
                         <p id="videoDescription">Descrição do vídeo...</p>
@@ -78,26 +244,26 @@
 
                 <div class="video-sidebar">
                     <div class="heatmap-section">
-                        <h4>Parte Mais Repetida</h4>
+                        <h4><i class="fas fa-chart-line btn-icon"></i>Parte Mais Repetida</h4>
                         <div id="heatmap" class="heatmap">
                             <p>Dados de heatmap aparecerão aqui</p>
                         </div>
                     </div>
                     <div class="collections-section">
-                        <h4>Coleções</h4>
+                        <h4><i class="fas fa-folder btn-icon"></i>Coleções</h4>
                         <div id="videoCollections"></div>
                     </div>
                 </div>
             </div>
 
             <div class="comments-section">
-                <h3>Comentários</h3>
+                <h3><i class="fas fa-comments btn-icon"></i>Comentários</h3>
                 <div id="commentsList" class="comments-list">
                     <p>Carregando comentários...</p>
                 </div>
                 <div class="add-comment">
                     <textarea id="commentText" placeholder="Adicione um comentário..."></textarea>
-                    <button onclick="addComment()">Comentar</button>
+                    <button onclick="addComment()"><i class="fas fa-paper-plane btn-icon"></i>Comentar</button>
                 </div>
             </div>
         </div>
@@ -106,14 +272,14 @@
         <div id="loginModal" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeModals()">&times;</span>
-                <h2>Login</h2>
+                <h2><i class="fas fa-sign-in-alt btn-icon"></i>Login</h2>
                 <form id="loginForm">
                     <input type="email" id="loginEmail" placeholder="Email" required>
                     <input type="password" id="loginPassword" placeholder="Senha" required>
-                    <button type="submit">Entrar</button>
+                    <button type="submit"><i class="fas fa-sign-in-alt btn-icon"></i>Entrar</button>
                 </form>
-                <div class="demo-credentials" style="margin-top: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
-                    <p style="margin: 0; font-size: 0.9rem; color: #666;">
+                <div class="demo-credentials">
+                    <p>
                         <strong>Demo:</strong> admin@seehere.com / admin123
                     </p>
                 </div>
@@ -123,12 +289,12 @@
         <div id="signupModal" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeModals()">&times;</span>
-                <h2>Cadastrar</h2>
+                <h2><i class="fas fa-user-plus btn-icon"></i>Cadastrar</h2>
                 <form id="signupForm">
                     <input type="text" id="signupName" placeholder="Nome de exibição" required>
                     <input type="email" id="signupEmail" placeholder="Email" required>
                     <input type="password" id="signupPassword" placeholder="Senha" required>
-                    <button type="submit">Cadastrar</button>
+                    <button type="submit"><i class="fas fa-user-plus btn-icon"></i>Cadastrar</button>
                 </form>
             </div>
         </div>
