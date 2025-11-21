@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Admin - Seehere</title>
+    <title>Painel Admin - Xpainel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="src/style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="admin-container">
         <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fas fa-stream"></i> Seehere Admin</h2>
+                <h2><i class="fas fa-stream"></i> Xpainel</h2>
                 <button class="sidebar-toggle" id="sidebarToggle">
                     <i class="fas fa-bars"></i>
                 </button>
@@ -31,16 +31,12 @@
                         <span>Vídeos</span>
                     </a>
                 </li>
-                <!-- Adicione este item ao sidebar-nav no index.html do admin -->
-<li class="nav-item">
-    <a href="#megaVideos" class="nav-link">
-        <i class="fas fa-cloud-download-alt"></i>
-        <span>Vídeos no MEGA</span>
-    </a>
-</li>
-                
-                
-                
+                <li class="nav-item">
+                    <a href="#megaVideos" class="nav-link">
+                        <i class="fas fa-cloud-download-alt"></i>
+                        <span>Vídeos no MEGA</span>
+                    </a>
+                </li>
                 <li class="nav-item">
                     <a href="#collections" class="nav-link">
                         <i class="fas fa-folder"></i>
@@ -51,12 +47,6 @@
                     <a href="#users" class="nav-link">
                         <i class="fas fa-users"></i>
                         <span>Usuários</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#comments" class="nav-link">
-                        <i class="fas fa-comments"></i>
-                        <span>Comentários</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -78,7 +68,7 @@
                     <img id="adminAvatar" src="https://ui-avatars.com/api/?name=Admin&background=007bff&color=fff" alt="Admin">
                     <div>
                         <strong id="adminName">Administrador</strong>
-                        <span id="adminEmail">admin@seehere.com</span>
+                        <span id="adminEmail">admin@xpainel.com</span>
                     </div>
                 </div>
                 <button class="logout-btn" onclick="logout()">
@@ -97,7 +87,7 @@
                 <div class="top-bar-right">
                     <button class="notification-btn" id="notificationBtn">
                         <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
+                        <span class="notification-badge">0</span>
                     </button>
                     <div class="theme-toggle">
                         <button onclick="toggleTheme()">
@@ -154,134 +144,22 @@
                         <div class="chart-card">
                             <h3>Vídeos Recentes</h3>
                             <div id="recentVideosList" class="recent-list">
-                                <!-- Vídeos recentes serão carregados via JS -->
+                                <div class="loading">Carregando...</div>
                             </div>
                         </div>
                         <div class="chart-card">
                             <h3>Atividade Recente</h3>
                             <div id="recentActivity" class="activity-list">
-                                <!-- Atividades serão carregadas via JS -->
+                                <div class="loading">Carregando...</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                
-                <!-- Mega Videos Page -->
-<div id="megaVideos" class="content-page">
-    <div class="page-header">
-        <h2>Importar Vídeos do MEGA</h2>
-        <div class="header-actions">
-            <button class="btn btn-secondary" onclick="loadMegaVideos()">
-                <i class="fas fa-sync-alt"></i> Atualizar
-            </button>
-        </div>
-    </div>
-
-    <div class="mega-setup-card">
-        <h3>🔗 Configurar Pasta MEGA</h3>
-        <div class="folder-input-group">
-            <input type="text" id="megaFolderUrl" 
-                   placeholder="Cole aqui o link da pasta MEGA (ex: https://mega.nz/folder/ID#CHAVE)"
-                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px;">
-            <button class="btn btn-primary" onclick="scanMegaFolder()">
-                <i class="fas fa-search"></i> Escanear Pasta
-            </button>
-        </div>
-        <small style="display: block; margin-top: 0.5rem; color: var(--text-muted);">
-            💡 O link deve ser de uma pasta pública do MEGA no formato: https://mega.nz/folder/SEU_ID#SUA_CHAVE
-        </small>
-    </div>
-
-    <div class="mega-stats" id="megaStats" style="display: none;">
-        <!-- Estatísticas serão carregadas via JS -->
-    </div>
-
-    <div class="mega-tabs" id="megaTabs" style="display: none;">
-        <div class="tab-section">
-            <h3>📥 Vídeos Não Importados <span id="notImportedCount" class="count-badge">0</span></h3>
-            <div id="megaNotImported" class="mega-files-grid">
-                <!-- Vídeos não importados serão carregados via JS -->
-            </div>
-        </div>
-
-        <div class="tab-section">
-            <h3>✅ Vídeos Já Importados <span id="importedCount" class="count-badge">0</span></h3>
-            <div id="megaImported" class="mega-files-grid">
-                <!-- Vídeos importados serão carregados via JS -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Import Mega Video Modal -->
-<div id="importMegaVideoModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>📥 Importar Vídeo do MEGA</h3>
-            <span class="close" onclick="closeModal('importMegaVideoModal')">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="importMegaVideoForm">
-                <input type="hidden" id="importMegaFileId">
-                <input type="hidden" id="importDownloadUrl">
-                
-                <div class="form-group">
-                    <label>📁 Arquivo:</label>
-                    <p id="importFileName" class="file-name" style="font-weight: bold;"></p>
-                    <p id="importFileSize" class="file-size" style="color: var(--text-muted);"></p>
-                </div>
-                
-                <div class="form-group">
-                    <label>📝 Título do Vídeo *</label>
-                    <input type="text" id="importVideoTitle" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>📄 Descrição</label>
-                    <textarea id="importVideoDescription" rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label>🏷️ Tags (separadas por vírgula)</label>
-                    <input type="text" id="importVideoTags" placeholder="tag1, tag2, tag3">
-                </div>
-                
-                <div class="form-group">
-                    <label>🖼️ Thumbnail URL (opcional)</label>
-                    <input type="url" id="importThumbnailUrl" placeholder="https://...">
-                    <small>Deixe em branco para gerar automaticamente</small>
-                </div>
-                
-                <div class="form-group">
-                    <label>📚 Coleção (opcional)</label>
-                    <select id="importCollection">
-                        <option value="">Nenhuma coleção</option>
-                    </select>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('importMegaVideoModal')">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-download"></i> Importar Vídeo
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-                
-                
-                
-                
-                
                 <!-- Videos Page -->
                 <div id="videos" class="content-page">
                     <div class="page-header">
                         <h2>Gerenciar Vídeos</h2>
-                        <button class="btn btn-primary" onclick="showAddVideoModal()">
-                            <i class="fas fa-plus"></i> Adicionar Vídeo
-                        </button>
                     </div>
 
                     <div class="filters-bar">
@@ -305,7 +183,9 @@
                                 </tr>
                             </thead>
                             <tbody id="videosTableBody">
-                                <!-- Dados dos vídeos serão carregados via JS -->
+                                <tr>
+                                    <td colspan="7" class="no-data">Carregando vídeos...</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -314,6 +194,53 @@
                         <button class="pagination-btn" id="prevPage">Anterior</button>
                         <span id="pageInfo">Página 1 de 1</span>
                         <button class="pagination-btn" id="nextPage">Próxima</button>
+                    </div>
+                </div>
+
+                <!-- Mega Videos Page -->
+                <div id="megaVideos" class="content-page">
+                    <div class="page-header">
+                        <h2>Importar Vídeos do MEGA</h2>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary" onclick="loadMegaVideos()">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mega-setup-card">
+                        <h3>🔗 Configurar Pasta MEGA</h3>
+                        <div class="folder-input-group">
+                            <input type="text" id="megaFolderUrl" 
+                                   placeholder="Cole aqui o link da pasta MEGA (ex: https://mega.nz/folder/ID#CHAVE)"
+                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                            <button class="btn btn-primary" id="scanMegaFolderBtn">
+                                <i class="fas fa-search"></i> Escanear Pasta
+                            </button>
+                        </div>
+                        <small style="display: block; margin-top: 0.5rem; color: var(--text-muted);">
+                            💡 O link deve ser de uma pasta pública do MEGA no formato: https://mega.nz/folder/SEU_ID#SUA_CHAVE
+                        </small>
+                    </div>
+
+                    <div class="mega-stats" id="megaStats">
+                        <!-- Estatísticas serão carregadas via JS -->
+                    </div>
+
+                    <div class="mega-tabs" id="megaTabs">
+                        <div class="tab-section">
+                            <h3>📥 Vídeos Não Importados <span id="notImportedCount" class="count-badge">0</span></h3>
+                            <div id="megaNotImported" class="mega-files-grid">
+                                <div class="no-data">Nenhuma pasta MEGA configurada</div>
+                            </div>
+                        </div>
+
+                        <div class="tab-section">
+                            <h3>✅ Vídeos Já Importados <span id="importedCount" class="count-badge">0</span></h3>
+                            <div id="megaImported" class="mega-files-grid">
+                                <div class="no-data">Nenhuma pasta MEGA configurada</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -327,7 +254,7 @@
                     </div>
 
                     <div class="collections-grid" id="collectionsGrid">
-                        <!-- Coleções serão carregadas via JS -->
+                        <div class="no-data">Carregando coleções...</div>
                     </div>
                 </div>
 
@@ -344,25 +271,17 @@
                                     <th>Usuário</th>
                                     <th>Email</th>
                                     <th>Role</th>
+                                    <th>Status</th>
                                     <th>Data Registro</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="usersTableBody">
-                                <!-- Dados dos usuários serão carregados via JS -->
+                                <tr>
+                                    <td colspan="6" class="no-data">Carregando usuários...</td>
+                                </tr>
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                <!-- Comments Page -->
-                <div id="comments" class="content-page">
-                    <div class="page-header">
-                        <h2>Moderar Comentários</h2>
-                    </div>
-
-                    <div class="comments-list" id="commentsList">
-                        <!-- Comentários serão carregados via JS -->
                     </div>
                 </div>
 
@@ -376,106 +295,18 @@
                         <div class="analytics-card">
                             <h3>Estatísticas Gerais</h3>
                             <div id="generalStats" class="system-info">
-                                <!-- Estatísticas serão carregadas via JS -->
+                                <div class="loading">Carregando estatísticas...</div>
                             </div>
                         </div>
                         <div class="analytics-card">
                             <h3>Vídeos Mais Populares</h3>
                             <div id="popularVideos">
-                                <!-- Vídeos populares serão carregados via JS -->
+                                <div class="loading">Carregando vídeos populares...</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                
-                <!-- Adicione este código ao content-pages no index.html do admin -->
-
-<!-- Mega Videos Page -->
-<div id="megaVideos" class="content-page">
-    <div class="page-header">
-        <h2>Vídeos no MEGA</h2>
-        <div class="header-actions">
-            <button class="btn btn-secondary" onclick="loadMegaVideos()">
-                <i class="fas fa-sync-alt"></i> Atualizar
-            </button>
-        </div>
-    </div>
-
-    <div class="mega-stats" id="megaStats">
-        <!-- Estatísticas serão carregadas via JS -->
-    </div>
-
-    <div class="mega-tabs">
-        <div class="tab-section">
-            <h3>Vídeos Não Importados <span id="notImportedCount" class="count-badge">0</span></h3>
-            <div id="megaNotImported" class="mega-files-grid">
-                <!-- Vídeos não importados serão carregados via JS -->
-            </div>
-        </div>
-
-        <div class="tab-section">
-            <h3>Vídeos Já Importados <span id="importedCount" class="count-badge">0</span></h3>
-            <div id="megaImported" class="mega-files-grid">
-                <!-- Vídeos importados serão carregados via JS -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Import Mega Video Modal -->
-<div id="importMegaVideoModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Importar Vídeo do MEGA</h3>
-            <span class="close" onclick="closeModal('importMegaVideoModal')">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="importMegaVideoForm">
-                <input type="hidden" id="importMegaFileId">
-                
-                <div class="form-group">
-                    <label>Arquivo:</label>
-                    <p id="importFileName" class="file-name"></p>
-                </div>
-                
-                <div class="form-group">
-                    <label>Título do Vídeo *</label>
-                    <input type="text" id="importVideoTitle" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>Descrição</label>
-                    <textarea id="importVideoDescription" rows="3"></textarea>
-                </div>
-                
-                <div class="form-group">
-                    <label>Tags (separadas por vírgula)</label>
-                    <input type="text" id="importVideoTags" placeholder="tag1, tag2, tag3">
-                </div>
-                
-                <div class="form-group">
-                    <label>Thumbnail URL (opcional)</label>
-                    <input type="url" id="importThumbnailUrl" placeholder="https://...">
-                </div>
-                
-                <div class="form-group">
-                    <label>Coleção (opcional)</label>
-                    <select id="importCollection">
-                        <option value="">Nenhuma coleção</option>
-                    </select>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('importMegaVideoModal')">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Importar Vídeo</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-                
-                
                 <!-- Settings Page -->
                 <div id="settings" class="content-page">
                     <div class="page-header">
@@ -487,7 +318,7 @@
                             <h3>Configurações Gerais</h3>
                             <div class="form-group">
                                 <label>Nome do Site:</label>
-                                <input type="text" id="siteName" value="Seehere">
+                                <input type="text" id="siteName" value="Xpainel">
                             </div>
                             <div class="form-group">
                                 <label>Descrição:</label>
@@ -512,54 +343,6 @@
     </div>
 
     <!-- Modals -->
-    <!-- Add Video Modal -->
-    <div id="addVideoModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Upload de Novo Vídeo</h3>
-            <span class="close" onclick="closeModal('addVideoModal')">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="addVideoForm" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label>Arquivo de Vídeo *</label>
-                    <input type="file" id="videoFile" accept="video/*" required>
-                    <small>Aceito: MP4, AVI, MOV, etc. (até 500MB)</small>
-                </div>
-                <div class="form-group">
-                    <label>Título do Vídeo *</label>
-                    <input type="text" id="videoTitle" required>
-                </div>
-                <div class="form-group">
-                    <label>Descrição</label>
-                    <textarea id="videoDescription" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Tags (separadas por vírgula)</label>
-                    <input type="text" id="videoTags" placeholder="tag1, tag2, tag3">
-                </div>
-                <div class="form-group">
-                    <label>Coleção (opcional)</label>
-                    <select id="videoCollection">
-                        <option value="">Nenhuma coleção</option>
-                        <!-- Coleções serão carregadas via JS -->
-                    </select>
-                </div>
-                <div class="upload-progress" id="uploadProgress" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <span id="progressText">0%</span>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('addVideoModal')">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Fazer Upload</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
     <!-- Add Collection Modal -->
     <div id="addCollectionModal" class="modal">
         <div class="modal-content">
@@ -590,6 +373,63 @@
         </div>
     </div>
 
+    <!-- Import Mega Video Modal -->
+    <div id="importMegaVideoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📥 Importar Vídeo do MEGA</h3>
+                <span class="close" onclick="closeModal('importMegaVideoModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="importMegaVideoForm">
+                    <input type="hidden" id="importMegaFileId">
+                    <input type="hidden" id="importDownloadUrl">
+                    
+                    <div class="form-group">
+                        <label>📁 Arquivo:</label>
+                        <p id="importFileName" class="file-name" style="font-weight: bold;"></p>
+                        <p id="importFileSize" class="file-size" style="color: var(--text-muted);"></p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📝 Título do Vídeo *</label>
+                        <input type="text" id="importVideoTitle" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📄 Descrição</label>
+                        <textarea id="importVideoDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🏷️ Tags (separadas por vírgula)</label>
+                        <input type="text" id="importVideoTags" placeholder="tag1, tag2, tag3">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🖼️ Thumbnail URL (opcional)</label>
+                        <input type="url" id="importThumbnailUrl" placeholder="https://...">
+                        <small>Deixe em branco para gerar automaticamente</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📚 Coleção (opcional)</label>
+                        <select id="importCollection">
+                            <option value="">Nenhuma coleção</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('importMegaVideoModal')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-download"></i> Importar Vídeo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Notifications Panel -->
     <div id="notificationsPanel" class="notifications-panel">
         <div class="notifications-header">
@@ -597,7 +437,10 @@
             <button class="close" onclick="closeNotifications()">&times;</button>
         </div>
         <div class="notifications-list" id="notificationsList">
-            <!-- Notificações serão carregadas via JS -->
+            <div class="no-data">
+                <i class="fas fa-bell-slash"></i>
+                <p>Nenhuma notificação</p>
+            </div>
         </div>
     </div>
 
@@ -609,6 +452,6 @@
         </div>
     </div>
 
-    <script src="src/admin.js"></script>
+    <script src="admin.js"></script>
 </body>
 </html>

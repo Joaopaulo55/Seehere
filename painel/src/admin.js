@@ -16,22 +16,662 @@ document.addEventListener('DOMContentLoaded', function() {
 // Funções de Inicialização
 function initializeAdmin() {
     console.log('🚀 Inicializando Painel Admin...');
-    console.log('📊 Dados iniciais:', {
-        url: window.location.href,
-        hasToken: !!localStorage.getItem('adminToken'),
-        hasUser: !!localStorage.getItem('adminUser'),
-        path: window.location.pathname
-    });
-    
     checkAuth();
     setupNavigation();
     loadTheme();
 }
 
+// Verificar rota atual
+function checkCurrentRoute() {
+    const currentPath = window.location.pathname;
+    console.log('📍 Rota atual:', currentPath);
+    
+    if (currentPath.includes('admin-login.html')) {
+        const token = localStorage.getItem('adminToken');
+        const user = localStorage.getItem('adminUser');
+        
+        if (token && user) {
+            console.log('🔄 Já autenticado, redirecionando para painel...');
+            window.location.replace('index.html');
+        }
+    }
+}
 
+// Verificar autenticação
+async function checkAuth() {
+    const token = localStorage.getItem('adminToken');
+    const userData = localStorage.getItem('adminUser');
+    
+    console.log('🔐 Verificando autenticação...', { 
+        hasToken: !!token, 
+        hasUserData: !!userData 
+    });
+    
+    if (!token || !userData) {
+        console.log('❌ Sem token ou dados de usuário, redirecionando para login');
+        redirectToLogin();
+        return;
+    }
+    
+    try {
+        currentUser = JSON.parse(userData);
+        updateUserInfo();
+        
+        // Verificar se é admin
+        if (currentUser.role !== 'ADMIN') {
+            showNotification('❌ Acesso negado. Apenas administradores podem acessar este painel.', 'error');
+            setTimeout(() => logout(), 2000);
+            return;
+        }
+        
+        console.log('✅ Usuário admin carregado:', currentUser.email);
+        
+        await verifyTokenWithTimeout(token);
+        
+    } catch (error) {
+        console.error('❌ Erro na verificação de autenticação:', error);
+        
+        if (error.message.includes('Token inválido') || error.message.includes('Timeout') || error.message.includes('Privilégios')) {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminUser');
+            redirectToLogin();
+        }
+    }
+}
 
+// Verificar token com timeout
+async function verifyTokenWithTimeout(token) {
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 5000);
+    });
+    
+    const verificationPromise = fetch(`${API_BASE}/api/auth/verify`, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    const response = await Promise.race([verificationPromise, timeoutPromise]);
+    
+    if (!response.ok) {
+        throw new Error('Token inválido');
+    }
+    
+    const data = await response.json();
+    
+    // Verificar se ainda é admin
+    if (data.user.role !== 'ADMIN') {
+        throw new Error('Privilégios de administrador revogados');
+    }
+    
+    currentUser = data.user;
+    localStorage.setItem('adminUser', JSON.stringify(data.user));
+    updateUserInfo();
+    
+    return true;
+}
 
-// Nova página para gerenciar vídeos do MEGA
+// Redirecionar para login
+function redirectToLogin() {
+    window.location.replace('admin-login.html');
+}
+
+// Atualizar informações do usuário
+function updateUserInfo() {
+    if (currentUser) {
+        const adminName = document.getElementById('adminName');
+        const adminEmail = document.getElementById('adminEmail');
+        const avatar = document.getElementById('adminAvatar');
+        
+        if (adminName) adminName.textContent = currentUser.displayName || 'Administrador';
+        if (adminEmail) adminEmail.textContent = currentUser.email;
+        
+        if (avatar) {
+            if (currentUser.avatarUrl) {
+                avatar.src = currentUser.avatarUrl;
+            } else {
+                const name = currentUser.displayName || currentUser.email || 'Admin';
+                avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=007bff&color=fff`;
+            }
+        }
+    }
+}
+
+// Configurar event listeners
+function setupEventListeners() {
+    const eventConfig = [
+        { element: 'sidebarToggle', event: 'click', handler: toggleSidebar },
+        { element: 'notificationBtn', event: 'click', handler: toggleNotifications },
+        { element: 'addCollectionForm', event: 'submit', handler: handleAddCollection },
+        { element: 'importMegaVideoForm', event: 'submit', handler: handleImportMegaVideo },
+        { element: 'videoSearch', event: 'input', handler: debounce(searchVideos, 500) },
+        { element: 'prevPage', event: 'click', handler: goToPrevPage },
+        { element: 'nextPage', event: 'click', handler: goToNextPage },
+        { element: 'scanMegaFolderBtn', event: 'click', handler: scanMegaFolder }
+    ];
+
+    eventConfig.forEach(config => {
+        try {
+            const element = typeof config.element === 'string' 
+                ? document.getElementById(config.element)
+                : config.element;
+            
+            if (element && config.handler) {
+                element.addEventListener(config.event, config.handler);
+            }
+        } catch (error) {
+            console.error(`Erro ao adicionar event listener para ${config.element}:`, error);
+        }
+    });
+
+    setupModalEventListeners();
+    setupNavigationEventListeners();
+    setupWindowEventListeners();
+    initializeSavedState();
+}
+
+// Configurar listeners de modal
+function setupModalEventListeners() {
+    window.addEventListener('click', function(event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (event.target === modal) {
+                closeModal(modal.id);
+            }
+        });
+    });
+
+    document.addEventListener('click', function(event) {
+        const notificationsPanel = document.getElementById('notificationsPanel');
+        const notificationBtn = document.getElementById('notificationBtn');
+        
+        if (notificationsPanel?.classList.contains('show') && 
+            !notificationsPanel.contains(event.target) && 
+            !notificationBtn?.contains(event.target)) {
+            closeNotifications();
+        }
+    });
+}
+
+// Configurar listeners de navegação
+function setupNavigationEventListeners() {
+    document.addEventListener('keydown', function(event) {
+        if (event.ctrlKey && event.key === '/') {
+            event.preventDefault();
+            const searchInput = document.getElementById('videoSearch');
+            if (searchInput) {
+                searchInput.focus();
+                showNotification('Busca focada - use Ctrl+/ novamente para voltar', 'info', 2000);
+            }
+        }
+        
+        if (event.key === 'Escape') {
+            closeAllModalsAndPanels();
+        }
+        
+        if (event.key >= '1' && event.key <= '7' && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            const pageIndex = parseInt(event.key) - 1;
+            const navLinks = document.querySelectorAll('.nav-link');
+            if (navLinks[pageIndex]) {
+                navLinks[pageIndex].click();
+            }
+        }
+    });
+}
+
+// Configurar listeners da janela
+function setupWindowEventListeners() {
+    window.addEventListener('online', () => {
+        showNotification('Conexão restaurada', 'success', 3000);
+        if (document.getElementById('videos')?.classList.contains('active')) {
+            loadVideos();
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        showNotification('Conexão perdida - modo offline', 'warning', 5000);
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+        const hasUnsavedChanges = document.querySelectorAll('form.dirty').length > 0;
+        if (hasUnsavedChanges) {
+            event.preventDefault();
+            event.returnValue = 'Você tem alterações não salvas. Tem certeza que deseja sair?';
+            return event.returnValue;
+        }
+    });
+}
+
+// Inicializar estado salvo
+function initializeSavedState() {
+    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (sidebarCollapsed) {
+        document.getElementById('sidebar')?.classList.add('collapsed');
+    }
+    
+    const savedSearch = localStorage.getItem('lastVideoSearch');
+    if (savedSearch && document.getElementById('videoSearch')) {
+        document.getElementById('videoSearch').value = savedSearch;
+    }
+    
+    const lastActivePage = localStorage.getItem('lastActivePage');
+    if (lastActivePage) {
+        const navLink = document.querySelector(`[href="#${lastActivePage}"]`);
+        if (navLink) navLink.click();
+    }
+}
+
+// Navegação
+function setupNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = this.getAttribute('href');
+            
+            if (target.startsWith('#')) {
+                const pageId = target.substring(1);
+                showPage(pageId);
+                
+                navLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            }
+        });
+    });
+    
+    const hash = window.location.hash.substring(1);
+    const initialPage = hash || 'dashboard';
+    showPage(initialPage);
+    
+    const activeLink = document.querySelector(`.nav-link[href="#${initialPage}"]`);
+    if (activeLink) activeLink.classList.add('active');
+}
+
+function showPage(pageId) {
+    document.querySelectorAll('.content-page').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) targetPage.classList.add('active');
+    
+    const pageTitle = document.getElementById('pageTitle');
+    const activeLink = document.querySelector(`.nav-link.active span`);
+    if (pageTitle && activeLink) {
+        pageTitle.textContent = activeLink.textContent;
+    }
+    
+    localStorage.setItem('lastActivePage', pageId);
+    
+    switch(pageId) {
+        case 'dashboard':
+            loadDashboardData();
+            break;
+        case 'videos':
+            loadVideos();
+            break;
+        case 'collections':
+            loadCollections();
+            break;
+        case 'users':
+            loadUsers();
+            break;
+        case 'megaVideos':
+            showMegaVideosPage();
+            break;
+        case 'analytics':
+            loadAnalytics();
+            break;
+        case 'settings':
+            loadSettings();
+            break;
+    }
+}
+
+// Dashboard
+async function loadDashboardData() {
+    showLoading();
+    
+    try {
+        await loadBasicStats();
+        await loadRecentVideos();
+        await loadRecentActivity();
+    } catch (error) {
+        console.error('Erro ao carregar dashboard:', error);
+        showNotification('Erro ao carregar dados do dashboard', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function loadBasicStats() {
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/dashboard`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const stats = data.stats || {};
+            
+            document.getElementById('totalVideos').textContent = stats.totalVideos || 0;
+            document.getElementById('totalViews').textContent = stats.totalViews?.toLocaleString() || '0';
+            document.getElementById('totalUsers').textContent = stats.totalUsers || 0;
+            
+        } else {
+            throw new Error('Falha ao carregar estatísticas');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar estatísticas:', error);
+        document.getElementById('totalVideos').textContent = '0';
+        document.getElementById('totalUsers').textContent = '0';
+        document.getElementById('totalViews').textContent = '0';
+    }
+}
+
+async function loadRecentVideos() {
+    try {
+        const response = await fetch(`${API_BASE}/api/videos?limit=5`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateRecentVideos(data.videos || []);
+        } else {
+            throw new Error('Falha ao carregar vídeos');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar vídeos recentes:', error);
+        updateRecentVideos([]);
+    }
+}
+
+function updateRecentVideos(videos) {
+    const container = document.getElementById('recentVideosList');
+    
+    if (!videos || videos.length === 0) {
+        container.innerHTML = '<div class="no-data">Nenhum vídeo encontrado</div>';
+        return;
+    }
+    
+    container.innerHTML = videos.map(video => `
+        <div class="recent-item">
+            <h4>${video.title}</h4>
+            <p>${video.owner?.displayName || 'Usuário'}</p>
+            <div class="video-stats">
+                <span>👁️ ${video.viewsCount || 0}</span>
+                <span>❤️ ${video.likesCount || 0}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function loadRecentActivity() {
+    try {
+        const sampleActivities = [
+            { 
+                type: 'video', 
+                message: 'Sistema inicializado', 
+                time: new Date().toLocaleTimeString('pt-BR'),
+                icon: 'play'
+            },
+            { 
+                type: 'system', 
+                message: 'Painel admin carregado', 
+                time: new Date().toLocaleTimeString('pt-BR'),
+                icon: 'cog'
+            }
+        ];
+        
+        updateRecentActivity(sampleActivities);
+    } catch (error) {
+        console.error('Erro ao carregar atividades:', error);
+        updateRecentActivity([]);
+    }
+}
+
+function updateRecentActivity(activities) {
+    const container = document.getElementById('recentActivity');
+    
+    if (!activities || activities.length === 0) {
+        container.innerHTML = '<div class="no-data">Nenhuma atividade recente</div>';
+        return;
+    }
+    
+    container.innerHTML = activities.map(activity => `
+        <div class="activity-item">
+            <div class="activity-icon">
+                <i class="fas fa-${activity.icon || 'bell'}"></i>
+            </div>
+            <div class="activity-content">
+                <p>${activity.message}</p>
+                <span class="activity-time">${activity.time}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Gerenciamento de Vídeos
+async function loadVideos() {
+    showLoading();
+    
+    try {
+        const search = document.getElementById('videoSearch')?.value || '';
+        
+        const response = await fetch(`${API_BASE}/api/admin/videos?limit=1000`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            let videos = data.videos || [];
+            
+            if (search) {
+                videos = videos.filter(video => 
+                    video.title.toLowerCase().includes(search.toLowerCase()) ||
+                    (video.description && video.description.toLowerCase().includes(search.toLowerCase()))
+                );
+            }
+            
+            updateVideosTable(videos);
+            updatePaginationInfo();
+        } else {
+            throw new Error('Falha ao carregar vídeos');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar vídeos:', error);
+        showNotification('Erro ao carregar vídeos', 'error');
+        updateVideosTable([]);
+    } finally {
+        hideLoading();
+    }
+}
+
+function updateVideosTable(videos) {
+    const tbody = document.getElementById('videosTableBody');
+    
+    if (!videos || videos.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="no-data">Nenhum vídeo encontrado</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = videos.map(video => `
+        <tr>
+            <td>
+                <img src="${video.thumbnailUrl || 'https://via.placeholder.com/80x45?text=No+Thumbnail'}" 
+                     alt="Thumbnail" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">
+            </td>
+            <td>
+                <strong>${video.title}</strong>
+                ${video.description ? `<br><small>${video.description}</small>` : ''}
+            </td>
+            <td>${video.viewsCount || 0}</td>
+            <td>${video.likesCount || 0}</td>
+            <td>
+                <span class="status-badge published">Publicado</span>
+            </td>
+            <td>${new Date(video.createdAt).toLocaleDateString('pt-BR')}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn btn-sm btn-primary" onclick="editVideo('${video.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteVideo('${video.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="viewVideoAnalytics('${video.id}')">
+                        <i class="fas fa-chart-bar"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Coleções
+async function loadCollections() {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/collections`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateCollectionsGrid(data.collections || []);
+        } else {
+            throw new Error('Falha ao carregar coleções');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar coleções:', error);
+        showNotification('Erro ao carregar coleções', 'error');
+        updateCollectionsGrid([]);
+    } finally {
+        hideLoading();
+    }
+}
+
+function updateCollectionsGrid(collections) {
+    const grid = document.getElementById('collectionsGrid');
+    
+    if (!collections || collections.length === 0) {
+        grid.innerHTML = '<div class="no-data">Nenhuma coleção encontrada</div>';
+        return;
+    }
+    
+    grid.innerHTML = collections.map(collection => `
+        <div class="collection-card">
+            <div class="collection-image">
+                ${collection.thumbnailUrl ? 
+                    `<img src="${collection.thumbnailUrl}" alt="${collection.name}" onerror="this.style.display='none'">` :
+                    `<i class="fas fa-folder"></i>`
+                }
+            </div>
+            <div class="collection-content">
+                <h3>${collection.name}</h3>
+                <p>${collection.description || 'Sem descrição'}</p>
+                <div class="collection-stats">
+                    <span>${collection._count?.videos || 0} vídeos</span>
+                </div>
+                <div class="collection-actions" style="margin-top: 1rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editCollection('${collection.id}')">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCollection('${collection.id}')">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Usuários
+async function loadUsers() {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/users`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateUsersTable(data.users || []);
+        } else {
+            throw new Error('Falha ao carregar usuários');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar usuários:', error);
+        showNotification('Erro ao carregar usuários', 'error');
+        updateUsersTable([]);
+    } finally {
+        hideLoading();
+    }
+}
+
+function updateUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    
+    if (!users || users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="no-data">Nenhum usuário encontrado</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <img src="${user.avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || user.email) + '&background=007bff&color=fff'}" 
+                         alt="${user.displayName}" style="width: 32px; height: 32px; border-radius: 50%;">
+                    <div>
+                        <strong>${user.displayName || 'Sem nome'}</strong>
+                        <br>
+                        <small>${user.email}</small>
+                    </div>
+                </div>
+            </td>
+            <td>${user.email}</td>
+            <td>
+                <span class="role-badge ${user.role.toLowerCase()}">${user.role}</span>
+            </td>
+            <td>
+                <span class="status-badge ${user.isActive ? 'published' : 'draft'}">
+                    ${user.isActive ? 'Ativo' : 'Inativo'}
+                </span>
+                ${user.isVerified ? '<br><small style="color: #28a745;">✓ Verificado</small>' : ''}
+            </td>
+            <td>${new Date(user.createdAt).toLocaleDateString('pt-BR')}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn btn-sm btn-primary" onclick="editUser('${user.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${user.id === currentUser?.id ? 'disabled' : ''}>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="viewUserDetails('${user.id}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// MEGA Videos
 function showMegaVideosPage() {
     showPage('megaVideos');
     document.getElementById('megaFolderUrl').value = currentMegaFolderUrl;
@@ -41,7 +681,6 @@ function showMegaVideosPage() {
     }
 }
 
-// Scan de pasta MEGA
 async function scanMegaFolder() {
     const folderUrl = document.getElementById('megaFolderUrl').value.trim();
     
@@ -85,12 +724,6 @@ async function scanMegaFolder() {
     } finally {
         hideLoading();
     }
-}
-
-// Carregar vídeos do MEGA (usado quando já tem URL salva)
-async function loadMegaVideos() {
-    if (!currentMegaFolderUrl) return;
-    await scanMegaFolder();
 }
 
 function updateMegaVideosUI(data) {
@@ -245,7 +878,7 @@ async function handleImportMegaVideo(e) {
             const result = await response.json();
             showNotification('✅ Vídeo importado com sucesso!', 'success');
             closeModal('importMegaVideoModal');
-            loadMegaVideos(); // Recarregar a lista
+            scanMegaFolder(); // Recarregar a lista
         } else {
             const error = await response.json();
             throw new Error(error.error || 'Erro ao importar vídeo');
@@ -258,236 +891,9 @@ async function handleImportMegaVideo(e) {
     }
 }
 
-
-
-
-// Adicione esta função para mostrar progresso
-function showUploadProgress(percent) {
-    const progressElement = document.getElementById('uploadProgress');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    
-    if (progressElement && progressFill && progressText) {
-        progressElement.style.display = 'block';
-        progressFill.style.width = `${percent}%`;
-        progressText.textContent = `${Math.round(percent)}%`;
-    }
-}
-
-function hideUploadProgress() {
-    const progressElement = document.getElementById('uploadProgress');
-    if (progressElement) {
-        progressElement.style.display = 'none';
-    }
-}
-
-// Atualize a função handleAddVideo com progresso
-async function handleAddVideo(e) {
-    e.preventDefault();
-    
-    const videoFile = document.getElementById('videoFile').files[0];
-    if (!videoFile) {
-        showNotification('Selecione um arquivo de vídeo', 'error');
-        return;
-    }
-
-    // Validar tamanho do arquivo (500MB)
-    if (videoFile.size > 500 * 1024 * 1024) {
-        showNotification('Arquivo muito grande. Máximo: 500MB', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('video', videoFile);
-    formData.append('title', document.getElementById('videoTitle').value);
-    formData.append('description', document.getElementById('videoDescription').value);
-    formData.append('tags', document.getElementById('videoTags').value);
-    
-    const collectionId = document.getElementById('videoCollection').value;
-    if (collectionId) {
-        formData.append('collectionId', collectionId);
-    }
-
-    showLoading();
-    showUploadProgress(0);
-
-    try {
-        // Simular progresso (em produção, use XMLHttpRequest para progresso real)
-        const progressInterval = setInterval(() => {
-            const currentProgress = parseInt(document.getElementById('progressFill').style.width) || 0;
-            if (currentProgress < 90) {
-                showUploadProgress(currentProgress + 10);
-            }
-        }, 500);
-
-        const response = await fetch(`${API_BASE}/api/upload/video`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-            },
-            body: formData
-        });
-
-        clearInterval(progressInterval);
-        showUploadProgress(100);
-
-        if (response.ok) {
-            const result = await response.json();
-            showNotification('✅ Vídeo enviado com sucesso!', 'success');
-            closeModal('addVideoModal');
-            document.getElementById('addVideoForm').reset();
-            hideUploadProgress();
-            loadVideos();
-        } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao enviar vídeo');
-        }
-    } catch (error) {
-        console.error('Erro ao enviar vídeo:', error);
-        showNotification(`❌ ${error.message}`, 'error');
-        hideUploadProgress();
-    } finally {
-        hideLoading();
-    }
-}
-async function loadCollectionsForModal() {
-    try {
-        const response = await fetch(`${API_BASE}/api/collections`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const select = document.getElementById('videoCollection');
-            
-            if (select && data.collections) {
-                // Manter a opção "Nenhuma coleção"
-                select.innerHTML = '<option value="">Nenhuma coleção</option>';
-                
-                data.collections.forEach(collection => {
-                    const option = document.createElement('option');
-                    option.value = collection.id;
-                    option.textContent = collection.name;
-                    select.appendChild(option);
-                });
-            }
-        }
-    } catch (error) {
-        console.error('Erro ao carregar coleções:', error);
-    }
-}
-
-// Adicione estas funções ao arquivo admin.js do frontend
-
-// Nova página para gerenciar vídeos do MEGA
-function showMegaVideosPage() {
-    showPage('megaVideos');
-    loadMegaVideos();
-}
-
-async function loadMegaVideos() {
-    showLoading();
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/admin/mega-videos`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            updateMegaVideosUI(data);
-        } else {
-            throw new Error('Falha ao carregar vídeos do MEGA');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar vídeos do MEGA:', error);
-        showNotification('Erro ao carregar vídeos do MEGA', 'error');
-        updateMegaVideosUI({ notInDatabase: [], alreadyInDatabase: [] });
-    } finally {
-        hideLoading();
-    }
-}
-
-function updateMegaVideosUI(data) {
-    const notImportedContainer = document.getElementById('megaNotImported');
-    const importedContainer = document.getElementById('megaImported');
-    const statsContainer = document.getElementById('megaStats');
-    
-    if (!data.notInDatabase || !data.alreadyInDatabase) {
-        notImportedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
-        importedContainer.innerHTML = '<div class="no-data">Erro ao carregar dados</div>';
-        return;
-    }
-
-    // Stats
-    if (statsContainer) {
-        statsContainer.innerHTML = `
-            <div class="stat-item">
-                <strong>Total no MEGA:</strong> ${data.stats?.totalInMega || 0}
-            </div>
-            <div class="stat-item">
-                <strong>Não importados:</strong> ${data.stats?.notImported || 0}
-            </div>
-            <div class="stat-item">
-                <strong>Já importados:</strong> ${data.stats?.alreadyImported || 0}
-            </div>
-        `;
-    }
-
-    // Not imported videos
-    if (data.notInDatabase.length === 0) {
-        notImportedContainer.innerHTML = '<div class="no-data">Nenhum vídeo não importado encontrado</div>';
-    } else {
-        notImportedContainer.innerHTML = data.notInDatabase.map(file => `
-            <div class="mega-file-card">
-                <div class="file-info">
-                    <h4>${file.name}</h4>
-                    <p>Tamanho: ${file.formattedSize}</p>
-                    <small>ID: ${file.downloadId}</small>
-                </div>
-                <div class="file-actions">
-                    <button class="btn btn-sm btn-primary" onclick="showImportModal('${file.downloadId}', '${file.name.replace(/'/g, "\\'")}')">
-                        <i class="fas fa-download"></i> Importar
-                    </button>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    // Already imported videos
-    if (data.alreadyInDatabase.length === 0) {
-        importedContainer.innerHTML = '<div class="no-data">Nenhum vídeo importado encontrado</div>';
-    } else {
-        importedContainer.innerHTML = data.alreadyInDatabase.map(file => `
-            <div class="mega-file-card imported">
-                <div class="file-info">
-                    <h4>${file.existingTitle || file.name}</h4>
-                    <p>Arquivo: ${file.name}</p>
-                    <p>Tamanho: ${file.formattedSize}</p>
-                    <small>ID: ${file.downloadId}</small>
-                </div>
-                <div class="file-status">
-                    <span class="status-badge published">✅ Importado</span>
-                </div>
-            </div>
-        `).join('');
-    }
-}
-
-function showImportModal(megaFileId, fileName) {
-    document.getElementById('importMegaFileId').value = megaFileId;
-    document.getElementById('importVideoTitle').value = fileName.replace(/\.[^/.]+$/, ""); // Remove extensão
-    document.getElementById('importFileName').textContent = fileName;
-    
-    // Carregar coleções para o select
-    loadCollectionsForImportModal();
-    
-    document.getElementById('importMegaVideoModal').style.display = 'block';
-}
-
 async function loadCollectionsForImportModal() {
     try {
-        const response = await fetch(`${API_BASE}/api/collections`, {
+        const response = await fetch(`${API_BASE}/api/admin/collections`, {
             headers: getAuthHeaders()
         });
         
@@ -508,766 +914,6 @@ async function loadCollectionsForImportModal() {
         }
     } catch (error) {
         console.error('Erro ao carregar coleções:', error);
-    }
-}
-
-async function handleImportMegaVideo(e) {
-    e.preventDefault();
-    
-    const megaFileId = document.getElementById('importMegaFileId').value;
-    const title = document.getElementById('importVideoTitle').value;
-    const description = document.getElementById('importVideoDescription').value;
-    const tags = document.getElementById('importVideoTags').value;
-    const thumbnailUrl = document.getElementById('importThumbnailUrl').value;
-    const collectionId = document.getElementById('importCollection').value;
-    
-    if (!title) {
-        showNotification('Título é obrigatório', 'error');
-        return;
-    }
-
-    showLoading();
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/admin/import-mega-video`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            body: JSON.stringify({
-                megaFileId,
-                title,
-                description,
-                tags,
-                thumbnailUrl,
-                collectionId
-            })
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            showNotification('✅ Vídeo importado com sucesso!', 'success');
-            closeModal('importMegaVideoModal');
-            loadMegaVideos(); // Recarregar a lista
-        } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao importar vídeo');
-        }
-    } catch (error) {
-        console.error('Erro ao importar vídeo:', error);
-        showNotification(`❌ ${error.message}`, 'error');
-    } finally {
-        hideLoading();
-    }
-}
-
-// Adicione também o HTML necessário para a nova página
-
-
-// Atualize a função showAddVideoModal
-function showAddVideoModal() {
-    document.getElementById('addVideoModal').style.display = 'block';
-    loadCollectionsForModal();
-}
-
-
-function checkCurrentRoute() {
-    const currentPath = window.location.pathname;
-    console.log('📍 Rota atual:', currentPath);
-    
-    if (currentPath.includes('admin-login.html')) {
-        const token = localStorage.getItem('adminToken');
-        const user = localStorage.getItem('adminUser');
-        
-        if (token && user) {
-            console.log('🔄 Já autenticado, redirecionando para painel...');
-            window.location.replace('index.html');
-        }
-    }
-}
-
-async function checkAuth() {
-    const token = localStorage.getItem('adminToken');
-    const userData = localStorage.getItem('adminUser');
-    
-    console.log('🔐 Verificando autenticação...', { 
-        hasToken: !!token, 
-        hasUserData: !!userData 
-    });
-    
-    if (!token || !userData) {
-        console.log('❌ Sem token ou dados de usuário, redirecionando para login');
-        redirectToLogin();
-        return;
-    }
-    
-    try {
-        currentUser = JSON.parse(userData);
-        updateUserInfo();
-        
-        console.log('✅ Usuário carregado do localStorage:', currentUser.email);
-        
-        await verifyTokenWithTimeout(token);
-        
-    } catch (error) {
-        console.error('❌ Erro na verificação de autenticação:', error);
-        
-        if (error.message.includes('Token inválido') || error.message.includes('Timeout')) {
-            localStorage.removeItem('adminToken');
-            localStorage.removeItem('adminUser');
-            redirectToLogin();
-        }
-    }
-}
-
-async function verifyTokenWithTimeout(token) {
-    const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 5000);
-    });
-    
-    const verificationPromise = fetch(`${API_BASE}/api/auth/me`, {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        }
-    });
-    
-    const response = await Promise.race([verificationPromise, timeoutPromise]);
-    
-    if (!response.ok) {
-        throw new Error('Token inválido');
-    }
-    
-    const data = await response.json();
-    currentUser = data.user;
-    localStorage.setItem('adminUser', JSON.stringify(data.user));
-    updateUserInfo();
-    
-    return true;
-}
-
-function redirectToLogin() {
-    window.location.replace('admin-login.html');
-}
-
-function updateUserInfo() {
-    if (currentUser) {
-        const adminName = document.getElementById('adminName');
-        const adminEmail = document.getElementById('adminEmail');
-        const avatar = document.getElementById('adminAvatar');
-        
-        if (adminName) adminName.textContent = currentUser.displayName || 'Administrador';
-        if (adminEmail) adminEmail.textContent = currentUser.email || 'admin@seehere.com';
-        
-        if (avatar && currentUser.avatarUrl) {
-            avatar.src = currentUser.avatarUrl;
-        } else if (avatar) {
-            const name = currentUser.displayName || currentUser.email || 'Admin';
-            avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=007bff&color=fff`;
-        }
-    }
-}
-
-function setupEventListeners() {
-    const eventConfig = [
-        { element: 'sidebarToggle', event: 'click', handler: toggleSidebar },
-        { element: 'notificationBtn', event: 'click', handler: toggleNotifications },
-        { element: 'addVideoForm', event: 'submit', handler: handleAddVideo },
-        { element: 'addCollectionForm', event: 'submit', handler: handleAddCollection },
-        { element: 'videoSearch', event: 'input', handler: debounce(searchVideos, 500) },
-        { element: 'prevPage', event: 'click', handler: goToPrevPage },
-        { element: 'nextPage', event: 'click', handler: goToNextPage }
-    ];
-
-    eventConfig.forEach(config => {
-        try {
-            const element = typeof config.element === 'string' 
-                ? document.getElementById(config.element)
-                : config.element;
-            
-            if (element && config.handler) {
-                element.addEventListener(config.event, config.handler);
-            }
-        } catch (error) {
-            console.error(`Erro ao adicionar event listener para ${config.element}:`, error);
-        }
-    });
-
-    setupModalEventListeners();
-    setupNavigationEventListeners();
-    setupWindowEventListeners();
-    initializeSavedState();
-}
-
-function setupModalEventListeners() {
-    window.addEventListener('click', function(event) {
-        const modals = document.querySelectorAll('.modal');
-        modals.forEach(modal => {
-            if (event.target === modal) {
-                closeModal(modal.id);
-            }
-        });
-    });
-
-    document.addEventListener('click', function(event) {
-        const notificationsPanel = document.getElementById('notificationsPanel');
-        const notificationBtn = document.getElementById('notificationBtn');
-        
-        if (notificationsPanel?.classList.contains('show') && 
-            !notificationsPanel.contains(event.target) && 
-            !notificationBtn?.contains(event.target)) {
-            closeNotifications();
-        }
-    });
-}
-
-function setupNavigationEventListeners() {
-    document.addEventListener('keydown', function(event) {
-        if (event.ctrlKey && event.key === '/') {
-            event.preventDefault();
-            const searchInput = document.getElementById('videoSearch');
-            if (searchInput) {
-                searchInput.focus();
-                showNotification('Busca focada - use Ctrl+/ novamente para voltar', 'info', 2000);
-            }
-        }
-        
-        if (event.key === 'Escape') {
-            closeAllModalsAndPanels();
-        }
-        
-        if (event.key >= '1' && event.key <= '7' && !event.ctrlKey && !event.altKey) {
-            event.preventDefault();
-            const pageIndex = parseInt(event.key) - 1;
-            const navLinks = document.querySelectorAll('.nav-link');
-            if (navLinks[pageIndex]) {
-                navLinks[pageIndex].click();
-            }
-        }
-    });
-}
-
-function setupWindowEventListeners() {
-    window.addEventListener('online', () => {
-        showNotification('Conexão restaurada', 'success', 3000);
-        if (document.getElementById('videos')?.classList.contains('active')) {
-            loadVideos();
-        }
-    });
-
-    window.addEventListener('offline', () => {
-        showNotification('Conexão perdida - modo offline', 'warning', 5000);
-    });
-
-    window.addEventListener('beforeunload', (event) => {
-        const hasUnsavedChanges = document.querySelectorAll('form.dirty').length > 0;
-        if (hasUnsavedChanges) {
-            event.preventDefault();
-            event.returnValue = 'Você tem alterações não salvas. Tem certeza que deseja sair?';
-            return event.returnValue;
-        }
-    });
-}
-
-function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const mainContent = document.querySelector('.main-content');
-    
-    if (sidebar && mainContent) {
-        sidebar.classList.toggle('collapsed');
-        const isCollapsed = sidebar.classList.contains('collapsed');
-        localStorage.setItem('sidebarCollapsed', isCollapsed);
-    }
-}
-
-function toggleNotifications() {
-    const panel = document.getElementById('notificationsPanel');
-    const btn = document.getElementById('notificationBtn');
-    
-    if (panel && btn) {
-        const isOpening = !panel.classList.contains('show');
-        panel.classList.toggle('show');
-        
-        if (isOpening) {
-            btn.classList.add('active');
-            loadNotifications();
-        } else {
-            btn.classList.remove('active');
-        }
-    }
-}
-
-function closeNotifications() {
-    const panel = document.getElementById('notificationsPanel');
-    const btn = document.getElementById('notificationBtn');
-    
-    if (panel) panel.classList.remove('show');
-    if (btn) btn.classList.remove('active');
-}
-
-function closeAllModalsAndPanels() {
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.style.display = 'none';
-    });
-    closeNotifications();
-    hideLoading();
-}
-
-function goToPrevPage() {
-    if (currentPage > 1) {
-        currentPage--;
-        loadVideos();
-        updatePaginationInfo();
-    }
-}
-
-function goToNextPage() {
-    if (currentPage < totalPages) {
-        currentPage++;
-        loadVideos();
-        updatePaginationInfo();
-    }
-}
-
-function initializeSavedState() {
-    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    if (sidebarCollapsed) {
-        document.getElementById('sidebar')?.classList.add('collapsed');
-    }
-    
-    const savedSearch = localStorage.getItem('lastVideoSearch');
-    if (savedSearch && document.getElementById('videoSearch')) {
-        document.getElementById('videoSearch').value = savedSearch;
-    }
-    
-    const lastActivePage = localStorage.getItem('lastActivePage');
-    if (lastActivePage) {
-        const navLink = document.querySelector(`[href="#${lastActivePage}"]`);
-        if (navLink) navLink.click();
-    }
-}
-
-// Navegação
-function setupNavigation() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const target = this.getAttribute('href');
-            
-            if (target.startsWith('#')) {
-                const pageId = target.substring(1);
-                showPage(pageId);
-                
-                navLinks.forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
-            }
-        });
-    });
-    
-    const hash = window.location.hash.substring(1);
-    const initialPage = hash || 'dashboard';
-    showPage(initialPage);
-    
-    const activeLink = document.querySelector(`.nav-link[href="#${initialPage}"]`);
-    if (activeLink) activeLink.classList.add('active');
-}
-
-function showPage(pageId) {
-    document.querySelectorAll('.content-page').forEach(page => {
-        page.classList.remove('active');
-    });
-    
-    const targetPage = document.getElementById(pageId);
-    if (targetPage) targetPage.classList.add('active');
-    
-    const pageTitle = document.getElementById('pageTitle');
-    const activeLink = document.querySelector(`.nav-link.active span`);
-    if (pageTitle && activeLink) {
-        pageTitle.textContent = activeLink.textContent;
-    }
-    
-    localStorage.setItem('lastActivePage', pageId);
-    
-    switch(pageId) {
-        case 'dashboard':
-            loadDashboardData();
-            break;
-        case 'videos':
-            loadVideos();
-            break;
-        case 'collections':
-            loadCollections();
-            break;
-        case 'users':
-            loadUsers();
-            break;
-        case 'comments':
-            loadComments();
-            break;
-        case 'analytics':
-            loadAnalytics();
-            break;
-        case 'settings':
-            loadSettings();
-            break;
-    }
-}
-
-// Dashboard
-async function loadDashboardData() {
-    showLoading();
-    
-    try {
-        await loadBasicStats();
-        await loadRecentVideos();
-        await loadRecentActivity();
-    } catch (error) {
-        console.error('Erro ao carregar dashboard:', error);
-        showNotification('Erro ao carregar dados do dashboard', 'error');
-    } finally {
-        hideLoading();
-    }
-}
-
-async function loadBasicStats() {
-    try {
-        const response = await fetch(`${API_BASE}/api/videos?limit=1000`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const videos = data.videos || [];
-            
-            const totalVideos = videos.length;
-            const totalViews = videos.reduce((sum, video) => sum + (video.viewsCount || 0), 0);
-            const totalLikes = videos.reduce((sum, video) => sum + (video.likesCount || 0), 0);
-            
-            document.getElementById('totalVideos').textContent = totalVideos;
-            document.getElementById('totalViews').textContent = totalViews.toLocaleString();
-            document.getElementById('totalComments').textContent = '0';
-            document.getElementById('totalUsers').textContent = '1';
-            
-        } else {
-            throw new Error('Falha ao carregar estatísticas');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar estatísticas:', error);
-        document.getElementById('totalVideos').textContent = '0';
-        document.getElementById('totalUsers').textContent = '1';
-        document.getElementById('totalViews').textContent = '0';
-        document.getElementById('totalComments').textContent = '0';
-    }
-}
-
-async function loadRecentVideos() {
-    try {
-        const response = await fetch(`${API_BASE}/api/videos?limit=5`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            updateRecentVideos(data.videos || []);
-        } else {
-            throw new Error('Falha ao carregar vídeos');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar vídeos recentes:', error);
-        updateRecentVideos([]);
-    }
-}
-
-function updateRecentVideos(videos) {
-    const container = document.getElementById('recentVideosList');
-    
-    if (!videos || videos.length === 0) {
-        container.innerHTML = '<div class="no-data">Nenhum vídeo encontrado</div>';
-        return;
-    }
-    
-    container.innerHTML = videos.map(video => `
-        <div class="recent-item">
-            <h4>${video.title}</h4>
-            <p>${video.owner?.displayName || 'Usuário'}</p>
-            <div class="video-stats">
-                <span>👁️ ${video.viewsCount || 0}</span>
-                <span>❤️ ${video.likesCount || 0}</span>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function loadRecentActivity() {
-    try {
-        const sampleActivities = [
-            { 
-                type: 'video', 
-                message: 'Sistema inicializado', 
-                time: new Date().toLocaleTimeString('pt-BR'),
-                icon: 'play'
-            },
-            { 
-                type: 'system', 
-                message: 'Painel admin carregado', 
-                time: new Date().toLocaleTimeString('pt-BR'),
-                icon: 'cog'
-            }
-        ];
-        
-        updateRecentActivity(sampleActivities);
-    } catch (error) {
-        console.error('Erro ao carregar atividades:', error);
-        updateRecentActivity([]);
-    }
-}
-
-function updateRecentActivity(activities) {
-    const container = document.getElementById('recentActivity');
-    
-    if (!activities || activities.length === 0) {
-        container.innerHTML = '<div class="no-data">Nenhuma atividade recente</div>';
-        return;
-    }
-    
-    container.innerHTML = activities.map(activity => `
-        <div class="activity-item">
-            <div class="activity-icon">
-                <i class="fas fa-${activity.icon || 'bell'}"></i>
-            </div>
-            <div class="activity-content">
-                <p>${activity.message}</p>
-                <span class="activity-time">${activity.time}</span>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Gerenciamento de Vídeos
-async function loadVideos() {
-    showLoading();
-    
-    try {
-        const search = document.getElementById('videoSearch')?.value || '';
-        
-        let url = `${API_BASE}/api/videos?limit=1000`;
-        
-        const response = await fetch(url, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            let videos = data.videos || [];
-            
-            if (search) {
-                videos = videos.filter(video => 
-                    video.title.toLowerCase().includes(search.toLowerCase()) ||
-                    (video.description && video.description.toLowerCase().includes(search.toLowerCase()))
-                );
-            }
-            
-            updateVideosTable(videos);
-            updatePaginationInfo();
-        } else {
-            throw new Error('Falha ao carregar vídeos');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar vídeos:', error);
-        showNotification('Erro ao carregar vídeos', 'error');
-        updateVideosTable([]);
-    } finally {
-        hideLoading();
-    }
-}
-
-function updateVideosTable(videos) {
-    const tbody = document.getElementById('videosTableBody');
-    
-    if (!videos || videos.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" class="no-data">Nenhum vídeo encontrado</td>
-            </tr>
-        `;
-        return;
-    }
-    
-    tbody.innerHTML = videos.map(video => `
-        <tr>
-            <td>
-                <img src="${video.thumbnailUrl || 'https://via.placeholder.com/80x45?text=No+Thumbnail'}" 
-                     alt="Thumbnail" style="width: 80px; height: 45px; object-fit: cover; border-radius: 4px;">
-            </td>
-            <td>
-                <strong>${video.title}</strong>
-                ${video.description ? `<br><small>${video.description}</small>` : ''}
-            </td>
-            <td>${video.viewsCount || 0}</td>
-            <td>${video.likesCount || 0}</td>
-            <td>
-                <span class="status-badge published">Publicado</span>
-            </td>
-            <td>${new Date(video.createdAt).toLocaleDateString('pt-BR')}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-sm btn-primary" onclick="editVideo('${video.id}')">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteVideo('${video.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                    <button class="btn btn-sm btn-secondary" onclick="viewVideoAnalytics('${video.id}')">
-                        <i class="fas fa-chart-bar"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-// Coleções
-async function loadCollections() {
-    showLoading();
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/collections`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            updateCollectionsGrid(data.collections || []);
-        } else {
-            throw new Error('Falha ao carregar coleções');
-        }
-    } catch (error) {
-        console.error('Erro ao carregar coleções:', error);
-        showNotification('Erro ao carregar coleções', 'error');
-        updateCollectionsGrid([]);
-    } finally {
-        hideLoading();
-    }
-}
-
-function updateCollectionsGrid(collections) {
-    const grid = document.getElementById('collectionsGrid');
-    
-    if (!collections || collections.length === 0) {
-        grid.innerHTML = '<div class="no-data">Nenhuma coleção encontrada</div>';
-        return;
-    }
-    
-    grid.innerHTML = collections.map(collection => `
-        <div class="collection-card">
-            <div class="collection-image">
-                ${collection.thumbnailUrl ? 
-                    `<img src="${collection.thumbnailUrl}" alt="${collection.name}" onerror="this.style.display='none'">` :
-                    `<i class="fas fa-folder"></i>`
-                }
-            </div>
-            <div class="collection-content">
-                <h3>${collection.name}</h3>
-                <p>${collection.description || 'Sem descrição'}</p>
-                <div class="collection-stats">
-                    <span>${collection.videos?.length || 0} vídeos</span>
-                </div>
-                <div class="collection-actions" style="margin-top: 1rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editCollection('${collection.id}')">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCollection('${collection.id}')">
-                        <i class="fas fa-trash"></i> Excluir
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-// Usuários
-async function loadUsers() {
-    showLoading();
-    
-    try {
-        const users = [currentUser].filter(Boolean);
-        updateUsersTable(users);
-    } catch (error) {
-        console.error('Erro ao carregar usuários:', error);
-        showNotification('Erro ao carregar usuários', 'error');
-        updateUsersTable([]);
-    } finally {
-        hideLoading();
-    }
-}
-
-function updateUsersTable(users) {
-    const tbody = document.getElementById('usersTableBody');
-    
-    if (!users || users.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="no-data">Nenhum usuário encontrado</td>
-            </tr>
-        `;
-        return;
-    }
-    
-    tbody.innerHTML = users.map(user => `
-        <tr>
-            <td>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <img src="${user.avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || user.email) + '&background=007bff&color=fff'}" 
-                         alt="${user.displayName}" style="width: 32px; height: 32px; border-radius: 50%;">
-                    <div>
-                        <strong>${user.displayName || 'Sem nome'}</strong>
-                    </div>
-                </div>
-            </td>
-            <td>${user.email}</td>
-            <td>
-                <span class="role-badge ${(user.role || 'ADMIN').toLowerCase()}">${user.role || 'ADMIN'}</span>
-            </td>
-            <td>${new Date(user.createdAt).toLocaleDateString('pt-BR')}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn btn-sm btn-primary" onclick="editUser('${user.id}')">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-// Comentários
-async function loadComments() {
-    showLoading();
-    
-    try {
-        updateCommentsList([]);
-    } catch (error) {
-        console.error('Erro ao carregar comentários:', error);
-        showNotification('Erro ao carregar comentários', 'error');
-        updateCommentsList([]);
-    } finally {
-        hideLoading();
-    }
-}
-
-function updateCommentsList(comments) {
-    const container = document.getElementById('commentsList');
-    
-    if (!comments || comments.length === 0) {
-        container.innerHTML = `
-            <div class="no-data">
-                <p>Nenhum comentário para moderar</p>
-                <p><small>Funcionalidade em desenvolvimento</small></p>
-            </div>
-        `;
-        return;
     }
 }
 
@@ -1296,22 +942,22 @@ async function loadGeneralStats() {
             <strong>Total de visualizações:</strong> <span id="statsTotalViews">0</span>
         </div>
         <div class="stat-item">
-            <strong>Usuários ativos:</strong> <span id="statsTotalUsers">1</span>
+            <strong>Usuários ativos:</strong> <span id="statsTotalUsers">0</span>
         </div>
     `;
     
     try {
-        const response = await fetch(`${API_BASE}/api/videos?limit=1000`, {
+        const response = await fetch(`${API_BASE}/api/admin/dashboard`, {
             headers: getAuthHeaders()
         });
         
         if (response.ok) {
             const data = await response.json();
-            const videos = data.videos || [];
-            const totalViews = videos.reduce((sum, video) => sum + (video.viewsCount || 0), 0);
+            const stats = data.stats || {};
             
-            document.getElementById('statsTotalVideos').textContent = videos.length;
-            document.getElementById('statsTotalViews').textContent = totalViews.toLocaleString();
+            document.getElementById('statsTotalVideos').textContent = stats.totalVideos || 0;
+            document.getElementById('statsTotalViews').textContent = stats.totalViews?.toLocaleString() || '0';
+            document.getElementById('statsTotalUsers').textContent = stats.totalUsers || 0;
         }
     } catch (error) {
         console.error('Erro ao carregar estatísticas:', error);
@@ -1361,9 +1007,25 @@ function updatePopularVideos(videos) {
 
 // Configurações
 async function loadSettings() {
-    document.getElementById('siteName').value = 'Seehere';
-    document.getElementById('siteDescription').value = 'Plataforma de streaming';
-    await checkSystemStatus();
+    try {
+        const response = await fetch(`${API_BASE}/api/admin/settings`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const settings = data.settings || {};
+            
+            document.getElementById('siteName').value = settings.siteName || 'Seehere';
+            document.getElementById('siteDescription').value = settings.siteDescription || 'Plataforma de streaming';
+            
+            await checkSystemStatus();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar configurações:', error);
+        document.getElementById('siteName').value = 'Seehere';
+        document.getElementById('siteDescription').value = 'Plataforma de streaming';
+    }
 }
 
 async function checkSystemStatus() {
@@ -1386,15 +1048,35 @@ async function checkSystemStatus() {
     lastUpdateElement.textContent = new Date().toLocaleString('pt-BR');
 }
 
-function saveSettings() {
-    showNotification('Configurações salvas com sucesso!', 'success');
+async function saveSettings() {
+    showLoading();
+    
+    try {
+        const settings = {
+            siteName: document.getElementById('siteName').value,
+            siteDescription: document.getElementById('siteDescription').value
+        };
+        
+        const response = await fetch(`${API_BASE}/api/admin/settings`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(settings)
+        });
+        
+        if (response.ok) {
+            showNotification('Configurações salvas com sucesso!', 'success');
+        } else {
+            throw new Error('Falha ao salvar configurações');
+        }
+    } catch (error) {
+        console.error('Erro ao salvar configurações:', error);
+        showNotification('Erro ao salvar configurações', 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // Modal Functions
-function showAddVideoModal() {
-    document.getElementById('addVideoModal').style.display = 'block';
-}
-
 function showAddCollectionModal() {
     document.getElementById('addCollectionModal').style.display = 'block';
 }
@@ -1404,7 +1086,6 @@ function closeModal(modalId) {
 }
 
 // Form Handlers
-// admin.js - Função de Upload Corrigida
 async function handleAddCollection(e) {
     e.preventDefault();
     
@@ -1424,12 +1105,9 @@ async function handleAddCollection(e) {
     try {
         console.log('📤 Enviando dados para criar coleção:', formData);
         
-        const response = await fetch(`${API_BASE}/api/collections`, {
+        const response = await fetch(`${API_BASE}/api/admin/collections`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(formData)
         });
         
@@ -1450,43 +1128,6 @@ async function handleAddCollection(e) {
     } catch (error) {
         console.error('❌ Erro ao criar coleção:', error);
         showNotification(`❌ ${error.message}`, 'error');
-    } finally {
-        hideLoading();
-    }
-}
-async function handleAddCollection(e) {
-    e.preventDefault();
-    
-    const formData = {
-        name: document.getElementById('collectionName').value,
-        description: document.getElementById('collectionDescription').value,
-        thumbnailUrl: document.getElementById('collectionThumbnail').value
-    };
-    
-    showLoading();
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/collections`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        if (response.ok) {
-            showNotification('Coleção criada com sucesso!', 'success');
-            closeModal('addCollectionModal');
-            document.getElementById('addCollectionForm').reset();
-            loadCollections();
-        } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Erro ao criar coleção');
-        }
-    } catch (error) {
-        console.error('Erro ao criar coleção:', error);
-        showNotification(error.message, 'error');
     } finally {
         hideLoading();
     }
@@ -1614,6 +1255,74 @@ function debounce(func, wait) {
     };
 }
 
+// UI Functions
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.querySelector('.main-content');
+    
+    if (sidebar && mainContent) {
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebarCollapsed', isCollapsed);
+    }
+}
+
+function toggleNotifications() {
+    const panel = document.getElementById('notificationsPanel');
+    const btn = document.getElementById('notificationBtn');
+    
+    if (panel && btn) {
+        const isOpening = !panel.classList.contains('show');
+        panel.classList.toggle('show');
+        
+        if (isOpening) {
+            btn.classList.add('active');
+            loadNotifications();
+        } else {
+            btn.classList.remove('active');
+        }
+    }
+}
+
+function closeNotifications() {
+    const panel = document.getElementById('notificationsPanel');
+    const btn = document.getElementById('notificationBtn');
+    
+    if (panel) panel.classList.remove('show');
+    if (btn) btn.classList.remove('active');
+}
+
+function closeAllModalsAndPanels() {
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.style.display = 'none';
+    });
+    closeNotifications();
+    hideLoading();
+}
+
+function goToPrevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadVideos();
+        updatePaginationInfo();
+    }
+}
+
+function goToNextPage() {
+    if (currentPage < totalPages) {
+        currentPage++;
+        loadVideos();
+        updatePaginationInfo();
+    }
+}
+
+function updatePaginationInfo() {
+    const pageInfo = document.getElementById('pageInfo');
+    if (pageInfo) {
+        pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+    }
+}
+
 // Placeholder functions for actions
 function editVideo(videoId) {
     showNotification(`Editando vídeo ${videoId} - Funcionalidade em desenvolvimento`, 'info');
@@ -1679,25 +1388,52 @@ function editUser(userId) {
     showNotification(`Editando usuário ${userId} - Funcionalidade em desenvolvimento`, 'info');
 }
 
+async function deleteUser(userId) {
+    if (confirm('Tem certeza que deseja excluir este usuário?')) {
+        showLoading();
+        try {
+            const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+            
+            if (response.ok) {
+                showNotification('Usuário excluído com sucesso!', 'success');
+                loadUsers();
+            } else {
+                throw new Error('Falha ao excluir usuário');
+            }
+        } catch (error) {
+            console.error('Erro ao excluir usuário:', error);
+            showNotification('Erro ao excluir usuário', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+function viewUserDetails(userId) {
+    showNotification(`Detalhes do usuário ${userId} - Funcionalidade em desenvolvimento`, 'info');
+}
+
 function searchVideos() {
     localStorage.setItem('lastVideoSearch', document.getElementById('videoSearch')?.value || '');
     loadVideos();
 }
 
-function updatePaginationInfo() {
-    const pageInfo = document.getElementById('pageInfo');
-    if (pageInfo) {
-        pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
-    }
-}
-
 // Notifications
 async function loadNotifications() {
     try {
-        setTimeout(() => {
-            const notifications = getSampleNotifications();
-            updateNotificationsList(notifications);
-        }, 500);
+        const response = await fetch(`${API_BASE}/api/admin/notifications`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateNotificationsList(data.notifications || []);
+        } else {
+            throw new Error('Falha ao carregar notificações');
+        }
     } catch (error) {
         console.error('Erro ao carregar notificações:', error);
         updateNotificationsList(getSampleNotifications());
@@ -1719,13 +1455,13 @@ function updateNotificationsList(notifications) {
     }
 
     container.innerHTML = notifications.map(notification => `
-        <div class="notification-item ${notification.unread ? 'unread' : ''}">
+        <div class="notification-item ${notification.read ? '' : 'unread'}">
             <div class="notification-icon">
-                <i class="fas fa-${getNotificationIcon(notification.type)}"></i>
+                <i class="fas fa-bell"></i>
             </div>
             <div class="notification-content">
-                <p>${notification.message}</p>
-                <span class="notification-time">${formatTime(notification.timestamp)}</span>
+                <p>${notification.message || 'Nova notificação'}</p>
+                <span class="notification-time">${formatTime(notification.createdAt)}</span>
             </div>
         </div>
     `).join('');
@@ -1735,24 +1471,9 @@ function getSampleNotifications() {
     return [
         {
             id: 1,
-            type: 'info',
             message: 'Sistema inicializado com sucesso',
-            timestamp: new Date(),
-            unread: true
-        },
-        {
-            id: 2,
-            type: 'success',
-            message: 'Backend conectado com sucesso',
-            timestamp: new Date(Date.now() - 300000),
-            unread: true
-        },
-        {
-            id: 3,
-            type: 'warning',
-            message: 'Alguns vídeos precisam de moderação',
-            timestamp: new Date(Date.now() - 1800000),
-            unread: false
+            createdAt: new Date(),
+            read: false
         }
     ];
 }
@@ -1810,11 +1531,6 @@ const dynamicStyles = `
 .role-badge.admin {
     background: #d1ecf1;
     color: #0c5460;
-}
-
-.role-badge.editor {
-    background: #d4edda;
-    color: #155724;
 }
 
 .role-badge.user {
@@ -1935,57 +1651,30 @@ const dynamicStyles = `
     margin-bottom: 1rem;
 }
 
-
-.upload-progress {
-    margin: 1rem 0;
+.mega-file-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--bg-color);
+}
+
+.mega-file-card.imported {
+    opacity: 0.7;
     background: var(--bg-secondary);
-    border-radius: var(--border-radius);
 }
 
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--border-color);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 0.5rem;
+.file-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
 }
 
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #007bff, #0056b3);
-    border-radius: 4px;
-    transition: width 0.3s ease;
-    width: 0%;
+.file-actions {
+    margin-top: 1rem;
 }
 
-.progress-text {
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    text-align: center;
-    display: block;
-}
-
-/* Estilos para o input de arquivo */
-.form-group input[type="file"] {
-    padding: 0.5rem;
-    border: 2px dashed var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--bg-secondary);
-    width: 100%;
-    cursor: pointer;
-}
-
-.form-group input[type="file"]:hover {
-    border-color: #007bff;
-}
-
-.form-group small {
-    display: block;
-    margin-top: 0.3rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
+.file-status {
+    margin-top: 1rem;
 }
 `;
 

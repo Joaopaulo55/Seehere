@@ -3,44 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Admin - Seehere</title>
+    <title>Login Admin - Xpainel</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
     <style>
-        :root {
-            --primary-color: #007bff;
-            --primary-dark: #0056b3;
-            --bg-color: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
-            --text-muted: #6c757d;
-            --border-color: #dee2e6;
-            --border-radius: 8px;
-            --box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #1a1a1a;
-            --card-bg: #2d2d2d;
-            --text-color: #ffffff;
-            --text-muted: #b0b0b0;
-            --border-color: #404040;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        /* Estilos específicos para a página de login */
+        .login-page {
             background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: var(--text-color);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
             padding: 1rem;
         }
         
@@ -136,20 +109,6 @@
             font-size: 0.9rem;
         }
 
-        .demo-info {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background: rgba(0,123,255,0.1);
-            border-radius: var(--border-radius);
-            border-left: 4px solid var(--primary-color);
-        }
-
-        .demo-info p {
-            margin: 0;
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
         .theme-toggle {
             position: fixed;
             top: 20px;
@@ -209,13 +168,13 @@
                 font-size: 1.5rem;
             }
             
-            body {
+            .login-page {
                 padding: 0.5rem;
             }
         }
     </style>
 </head>
-<body>
+<body class="login-page">
     <button class="theme-toggle" onclick="toggleTheme()">
         <i class="fas fa-moon"></i>
     </button>
@@ -223,14 +182,14 @@
     <div class="login-container">
         <div class="login-box">
             <div class="login-logo">
-                <h1><i class="fas fa-stream"></i> Seehere Admin</h1>
+                <h1><i class="fas fa-stream"></i> Xpainel</h1>
                 <p>Painel Administrativo</p>
             </div>
             
             <form class="login-form" id="loginForm">
                 <div class="form-group">
                     <label for="email">Email</label>
-                    <input type="email" id="email" required placeholder="admin@seehere.com">
+                    <input type="email" id="email" required placeholder="seu-email@dominio.com">
                 </div>
                 
                 <div class="form-group">
@@ -245,15 +204,9 @@
                     <i class="fas fa-sign-in-alt"></i> Entrar
                 </button>
             </form>
-
-            <div class="demo-info">
-                <p><strong>Credenciais de Demo:</strong><br>
-                Email: admin@seehere.com<br>
-                Senha: admin123</p>
-            </div>
             
             <div class="login-footer">
-                <p>© 2024 Seehere Streaming Platform</p>
+                <p>© 2024 Xpainel Streaming Platform</p>
                 <p style="margin-top: 0.5rem; font-size: 0.8rem;">
                     Backend: <span id="backendStatus" style="color: #28a745;">Conectado</span>
                 </p>
@@ -298,13 +251,6 @@
             }
         }
 
-        // Auto-fill for development and testing
-        function autoFillCredentials() {
-            // Sempre preencher para facilitar o teste
-            document.getElementById('email').value = 'admin@seehere.com';
-            document.getElementById('password').value = 'admin123';
-        }
-
         // Message functions
         function showError(message) {
             const errorElement = document.getElementById('errorMessage');
@@ -329,7 +275,69 @@
             document.getElementById('successMessage').style.display = 'none';
         }
 
-        // Login handler
+        // Verificar se já está logado - CORREÇÃO DO PROBLEMA DE REDIRECIONAMENTO
+        function checkExistingLogin() {
+            const token = localStorage.getItem('adminToken');
+            const user = localStorage.getItem('adminUser');
+            
+            console.log('🔍 Verificando login existente...', { 
+                hasToken: !!token, 
+                hasUser: !!user 
+            });
+            
+            // Só redireciona se tiver token E usuário válido
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    // Verifica se o usuário tem role de admin
+                    if (userData.role === 'ADMIN') {
+                        console.log('✅ Login admin detectado, verificando token...');
+                        // Verifica se o token ainda é válido
+                        verifyTokenAndRedirect(token);
+                    } else {
+                        console.log('❌ Usuário não é admin, limpando dados...');
+                        localStorage.removeItem('adminToken');
+                        localStorage.removeItem('adminUser');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao verificar usuário:', error);
+                    localStorage.removeItem('adminToken');
+                    localStorage.removeItem('adminUser');
+                }
+            }
+        }
+
+        // Verificar token e redirecionar
+        async function verifyTokenAndRedirect(token) {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Atualiza os dados do usuário no localStorage
+                    localStorage.setItem('adminUser', JSON.stringify(data.user));
+                    console.log('✅ Token válido, redirecionando para painel...');
+                    showSuccess('Redirecionando para o painel...');
+                    setTimeout(() => {
+                        window.location.replace('index.html');
+                    }, 1000);
+                } else {
+                    throw new Error('Token inválido');
+                }
+            } catch (error) {
+                console.error('❌ Token inválido ou erro na verificação:', error);
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminUser');
+                showError('Sessão expirada. Faça login novamente.');
+            }
+        }
+
+        // Login handler - CORREÇÃO DO PROBLEMA DE AUTENTICAÇÃO
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -366,22 +374,22 @@
                 
                 console.log('Resposta do login:', data);
                 
-                if (response.ok) {
-                    // Verificar se é admin (na API atual, todos os usuários podem acessar o admin)
-                    // Em produção, você teria uma verificação de role
-                    if (data.user) {
-                        localStorage.setItem('adminToken', data.token);
-                        localStorage.setItem('adminUser', JSON.stringify(data.user));
-                        
-                        showSuccess('Login realizado com sucesso! Redirecionando...');
-                        
-                        // Redirecionar após breve delay
-                        setTimeout(() => {
-                            window.location.href = 'index.html';
-                        }, 1500);
-                    } else {
-                        throw new Error('Usuário não encontrado na resposta');
+                if (response.ok && data.user) {
+                    // VERIFICAÇÃO CRÍTICA: Garantir que o usuário é ADMIN
+                    if (data.user.role !== 'ADMIN') {
+                        throw new Error('Acesso negado. Apenas administradores podem acessar este painel.');
                     }
+                    
+                    // Salva token e dados do usuário
+                    localStorage.setItem('adminToken', data.token);
+                    localStorage.setItem('adminUser', JSON.stringify(data.user));
+                    
+                    showSuccess('Login realizado com sucesso! Redirecionando...');
+                    
+                    // Redirecionar após breve delay
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1500);
                 } else {
                     throw new Error(data.error || 'Erro no login. Verifique suas credenciais.');
                 }
@@ -393,6 +401,10 @@
                 } else {
                     showError(error.message);
                 }
+                
+                // Limpa dados inválidos do localStorage
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('adminUser');
             } finally {
                 // Restaurar botão
                 loginBtn.disabled = false;
@@ -400,33 +412,10 @@
             }
         });
 
-        // Verificar se já está logado - VERSÃO CORRIGIDA
-        function checkExistingLogin() {
-    const token = localStorage.getItem('adminToken');
-    const user = localStorage.getItem('adminUser');
-    
-    console.log('🔍 Verificando login existente...', { 
-        hasToken: !!token, 
-        hasUser: !!user 
-    });
-    
-    // ⚠️ REMOVA ou COMENTE o redirecionamento automático
-    // if (token && user) {
-    //     console.log('✅ Login detectado, redirecionando para painel...');
-    //     showSuccess('Redirecionando para o painel...');
-    //     setTimeout(() => {
-    //         window.location.replace('index.html');
-    //     }, 500);
-    // }
-    
-    // Em vez disso, apenas preencha as credenciais
-    autoFillCredentials();
-}
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🔐 Admin Login Inicializado');
             checkBackendStatus();
-            autoFillCredentials();
             checkExistingLogin();
             
             // Focar no campo de email
@@ -437,6 +426,14 @@
         document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Prevenir problemas de cache
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                console.log('Página carregada do cache, verificando estado...');
+                checkExistingLogin();
             }
         });
     </script>
