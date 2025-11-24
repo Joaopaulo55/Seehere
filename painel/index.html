@@ -244,6 +244,81 @@
                     </div>
                 </div>
 
+                
+                <!-- Mega Link Manager Modal -->
+<div id="megaLinkManagerModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>📁 Gerenciador de Links MEGA</h3>
+            <button class="close" onclick="closeModal('megaLinkManagerModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="add-link-form" style="margin-bottom: 2rem;">
+                <h4>Adicionar Nova Pasta</h4>
+                <form id="addMegaLinkForm" onsubmit="addMegaLink(event)">
+                    <div class="form-group">
+                        <label>Nome da Pasta (opcional)</label>
+                        <input type="text" id="newLinkName" placeholder="Ex: Filmes 2024" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>URL da Pasta MEGA *</label>
+                        <input type="text" id="newLinkUrl" placeholder="https://mega.nz/folder/ID#CHAVE" class="form-control" required>
+                        <small>Formato: https://mega.nz/folder/ID#CHAVE</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Adicionar Link
+                    </button>
+                </form>
+            </div>
+
+            <div class="links-list">
+                <h4>Pastas Configuradas</h4>
+                <div id="megaLinksList" class="no-data">Carregando...</div>
+            </div>
+
+            <div class="quick-actions" style="margin-top: 2rem;">
+                <h4>Ações Rápidas</h4>
+                <button class="btn btn-success" onclick="scanAllMegaFolders()">
+                    <i class="fas fa-sync"></i> Scan Todas as Pastas
+                </button>
+                <button class="btn btn-info" onclick="showMegaBulkImport()">
+                    <i class="fas fa-download"></i> Importação em Massa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mega Bulk Import Modal -->
+<div id="megaBulkImportModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3>📥 Importação em Massa</h3>
+            <button class="close" onclick="closeModal('megaBulkImportModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="bulk-import-info" style="margin-bottom: 2rem;">
+                <p>Selecione os vídeos que deseja importar em massa:</p>
+                <div id="bulkImportFiles" class="bulk-files-list">
+                    <!-- Lista de arquivos será carregada aqui -->
+                </div>
+            </div>
+            
+            <div class="bulk-import-actions">
+                <button class="btn btn-primary" onclick="importSelectedVideos()">
+                    <i class="fas fa-download"></i> Importar Selecionados
+                </button>
+                <button class="btn btn-secondary" onclick="closeModal('megaBulkImportModal')">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+                
+                
+                
+                
                 <!-- Collections Page -->
                 <div id="collections" class="content-page">
                     <div class="page-header">

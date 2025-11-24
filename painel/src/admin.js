@@ -454,6 +454,261 @@ function updateRecentActivity(activities) {
     `).join('');
 }
 
+// Gerenciador de Links MEGA
+async function showMegaLinkManager() {
+    const modal = document.getElementById('megaLinkManagerModal');
+    if (!modal) {
+        createMegaLinkManagerModal();
+    }
+    
+    await loadMegaLinks();
+    document.getElementById('megaLinkManagerModal').style.display = 'block';
+}
+
+function createMegaLinkManagerModal() {
+    const modalHTML = `
+    <div id="megaLinkManagerModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>📁 Gerenciador de Links MEGA</h3>
+                <button class="close" onclick="closeModal('megaLinkManagerModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="add-link-form" style="margin-bottom: 2rem;">
+                    <h4>Adicionar Nova Pasta</h4>
+                    <form id="addMegaLinkForm" onsubmit="addMegaLink(event)">
+                        <div class="form-group">
+                            <label>Nome da Pasta (opcional)</label>
+                            <input type="text" id="newLinkName" placeholder="Ex: Filmes 2024" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>URL da Pasta MEGA *</label>
+                            <input type="text" id="newLinkUrl" placeholder="https://mega.nz/folder/ID#CHAVE" class="form-control" required>
+                            <small>Formato: https://mega.nz/folder/ID#CHAVE</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Adicionar Link
+                        </button>
+                    </form>
+                </div>
+
+                <div class="links-list">
+                    <h4>Pastas Configuradas</h4>
+                    <div id="megaLinksList" class="no-data">Carregando...</div>
+                </div>
+
+                <div class="quick-actions" style="margin-top: 2rem;">
+                    <h4>Ações Rápidas</h4>
+                    <button class="btn btn-success" onclick="scanAllMegaFolders()">
+                        <i class="fas fa-sync"></i> Scan Todas as Pastas
+                    </button>
+                    <button class="btn btn-info" onclick="showMegaBulkImport()">
+                        <i class="fas fa-download"></i> Importação em Massa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+async function loadMegaLinks() {
+    try {
+        const response = await fetch(`${API_BASE}/api/mega-v2/links`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            updateMegaLinksList(data.links || []);
+        } else {
+            throw new Error('Falha ao carregar links');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar links:', error);
+        document.getElementById('megaLinksList').innerHTML = '<div class="no-data">Erro ao carregar links</div>';
+    }
+}
+
+function updateMegaLinksList(links) {
+    const container = document.getElementById('megaLinksList');
+    
+    if (!links || links.length === 0) {
+        container.innerHTML = '<div class="no-data">Nenhuma pasta configurada</div>';
+        return;
+    }
+    
+    container.innerHTML = links.map(link => `
+        <div class="mega-link-item" style="border: 1px solid var(--border-color); padding: 1rem; margin-bottom: 1rem; border-radius: 8px;">
+            <div style="display: flex; justify-content: between; align-items: start;">
+                <div style="flex: 1;">
+                    <h5 style="margin: 0 0 0.5rem 0;">${link.name}</h5>
+                    <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted); word-break: break-all;">
+                        ${link.url}
+                    </p>
+                    <small style="color: var(--text-muted);">
+                        Adicionado em: ${new Date(link.createdAt).toLocaleDateString('pt-BR')}
+                    </small>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-sm btn-primary" onclick="scanSingleMegaFolder('${link.id}')">
+                        <i class="fas fa-search"></i> Scan
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="removeMegaLink('${link.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function addMegaLink(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('newLinkName').value;
+    const url = document.getElementById('newLinkUrl').value.trim();
+    
+    if (!url) {
+        showNotification('URL é obrigatória', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/mega-v2/links`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ url, name })
+        });
+        
+        if (response.ok) {
+            showNotification('Link adicionado com sucesso!', 'success');
+            document.getElementById('addMegaLinkForm').reset();
+            await loadMegaLinks();
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Erro ao adicionar link');
+        }
+    } catch (error) {
+        showNotification(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function removeMegaLink(linkId) {
+    if (!confirm('Tem certeza que deseja remover este link?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/mega-v2/links/${linkId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            showNotification('Link removido com sucesso!', 'success');
+            await loadMegaLinks();
+        } else {
+            throw new Error('Erro ao remover link');
+        }
+    } catch (error) {
+        showNotification(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function scanAllMegaFolders() {
+    try {
+        const linksResponse = await fetch(`${API_BASE}/api/mega-v2/links`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (linksResponse.ok) {
+            const data = await linksResponse.json();
+            const links = data.links || [];
+            
+            if (links.length === 0) {
+                showNotification('Nenhuma pasta configurada para scan', 'warning');
+                return;
+            }
+            
+            const folderUrls = links.map(link => link.url);
+            await performBulkScan(folderUrls);
+            
+        } else {
+            throw new Error('Falha ao carregar links');
+        }
+    } catch (error) {
+        showNotification(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function scanSingleMegaFolder(linkId) {
+    try {
+        const linksResponse = await fetch(`${API_BASE}/api/mega-v2/links`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (linksResponse.ok) {
+            const data = await linksResponse.json();
+            const link = data.links.find(l => l.id === linkId);
+            
+            if (link) {
+                document.getElementById('megaFolderUrl').value = link.url;
+                closeModal('megaLinkManagerModal');
+                scanMegaFolder();
+            }
+        }
+    } catch (error) {
+        showNotification(`❌ ${error.message}`, 'error');
+    }
+}
+
+async function performBulkScan(folderUrls) {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/mega-v2/scan-multiple`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ folderUrls })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Falha no scan múltiplo');
+        }
+        
+        // Atualizar a interface com os resultados
+        updateMegaVideosUI(data);
+        showNotification(`✅ Scan completo! Encontrados ${data.stats.totalScanned} vídeos em ${data.stats.foldersScanned} pastas`, 'success');
+        
+    } catch (error) {
+        console.error('Erro no scan múltiplo:', error);
+        showNotification(`❌ ${error.message}`, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Adicione um botão no seu HTML para o gerenciador de links
+function addMegaLinkManagerButton() {
+    const megaSection = document.querySelector('#megaVideos .section-header');
+    if (megaSection) {
+        const button = document.createElement('button');
+        button.className = 'btn btn-info';
+        button.innerHTML = '<i class="fas fa-link"></i> Gerenciar Links';
+        button.onclick = showMegaLinkManager;
+        megaSection.appendChild(button);
+    }
+}
+
+// Chame esta função após a inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(addMegaLinkManagerButton, 1000);
+});
+
+
 // Gerenciamento de Vídeos
 async function loadVideos() {
     showLoading();
